@@ -1,0 +1,29 @@
+%abstract here
+Intraoral scanning is commonly performed manually by trained dental personnel, making the process costly,
+time-consuming, and dependent on operator experience. At the same time, automating this task is challenging
+because a robot must move safely around complex dental geometry while capturing sufficient data without
+causing any harm to the patient. This project investigates whether existing robotics, scanning, and computer
+vision technologies can be combined into an automated system for intraoral dental scanning and modeling.
+\newline\newline
+The project aims to be able to automate the process in an environment, where the positions of the robot arm
+and an inert teeth model, in the form of an artificial head, are precisely known and don’t change. The concrete
+setup is roughly as follows: A dental scanner is mounted onto a robotic arm using a custom 3D-printed housing,
+which allows controlled movement of the scanner around the previously mentioned teeth model. This is then
+operated through a multitude of preexisting components and libraries, that are chained together in order to let
+the robot autonomously move around the teeth model. The basic concept that emanates from that is a loop, in
+which the robot moves to a position, takes a scan, and with that updates the current digital model of the teeth.
+The updated digital model is then used to derive the next scanning position. This repeats until the digital model
+reaches a certain level of accuracy, which is detailed further below.
+\newline\newline
+The scope of the project includes the mechanical integration of the scanner, the generation of suitable robot
+trajectories, the acquisition of image or scan data, and the pipeline of repeatedly modeling the scan data into a
+digital model of the teeth. The target pose estimation for the next best scan, which is needed for this project, will
+be contributed by an external student as part of their bachelor’s thesis.
+\newline\newline
+Evaluation of the system is realized by analyzing scan coverage and registration quality of the generated digital
+model. This means that certain regions of the teeth have to be completely modeled and, to a degree, shouldn’t
+have any gaps in them. The resulting model is then also compared with the manually performed scan.
+\newline\newline
+The resulting system may provide a basis for further investigating automated intraoral scanning under controlled
+conditions. In the future, the results of this project may be used to create a specialized medical robot, designed
+to be certifiable to work with real humans, thus making trained personnel available for other tasks.

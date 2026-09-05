@@ -1,0 +1,173 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% Packages
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+\usepackage{graphicx}
+\graphicspath{{assets/}{assets/kalman/}{./}}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg,.jpeg}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{gensymb}
+\usepackage{hyperref}
+\usepackage{xparse}
+\usepackage{booktabs} % Required for \toprule, \midrule, \bottomrule in tables
+\usepackage{array,tabularx} % Full-width tables with wrapping columns
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\usepackage{placeins} % Provides \FloatBarrier to keep figures from moving too far
+
+\usepackage{subcaption} % Required for \subcaption inside figures (Kalman section)
+
+% \usepackage{cite} % Edit: incompatible with already existing biblatex (l, 48)
+\usepackage{url}
+\usepackage{microtype}
+\usepackage{balance}
+\usepackage{enumitem}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.symbols, calc, decorations.pathmorphing}
+
+% Packages required for the PID section
+\usepackage{wrapfig}
+\usepackage{siunitx}
+\usepackage{caption}
+
+% Command used in the PID section
+\newcommand{\source}[2][Source]{\vspace{-6pt} \caption*{#1: #2}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\q}{\mathbf{q}}
+\newcommand{\vct}[1]{\mathbf{#1}}
+\newcommand{\quatmul}{\otimes}
+\newcommand{\quat}{\mathbf{q}}
+
+
+% Bibliography
+% Compile sequence: pdflatex -> biber -> pdflatex -> pdflatex
+\usepackage[backend=biber,style=ieee,sorting=none]{biblatex}
+\addbibresource{Bibliography.bib}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% =========================================================
+% Toggle: page breaks between mini papers
+% =========================================================
+\newif\ifchapterpagebreaks
+
+% Change exactly one of these two lines:
+% \chapterpagebreakstrue     % page breaks ON
+\chapterpagebreaksfalse  % page breaks OFF
+
+\newcommand{\chapterbreak}{%
+    \FloatBarrier
+    \ifchapterpagebreaks
+        \clearpage
+    \fi
+}
+
+% =========================================================
+% Clickable grouped email helper
+% =========================================================
+\newcommand{\emaildomain}{study.thws.de}
+\newcommand{\emaillocal}[1]{\href{mailto:#1@\emaildomain}{#1}}
+
+\newcommand{\thwsemaildomain}{thws.de}
+\newcommand{\thwsemaillocal}[1]{\href{mailto:#1@\thwsemaildomain}{#1}}
+
+% =========================================================
+% IEEE wide figure helpers
+% =========================================================
+% Command version:
+% \wideimage[width]{path-without-extension}{caption}{label}
+\NewDocumentCommand{\wideimage}{O{0.95\textwidth} m m m}{%
+    \begin{figure*}[!t]
+        \centering
+        \includegraphics[width=#1]{#2}
+        \caption{#3}
+        \label{#4}
+    \end{figure*}
+}
+
+% Environment version:
+% \begin{widefigureenv}{caption}{label}
+%   ... any figure content ...
+% \end{widefigureenv}
+\NewDocumentEnvironment{widefigureenv}{m m}{%
+    \begin{figure*}[!t]
+        \centering
+}{%
+        \caption{#1}
+        \label{#2}
+    \end{figure*}
+}
+
+\title{DentaVision: Automating Intraoral Scanning \& Digital 3D Dental Modeling with Robotics}
+
+\author{
+\IEEEauthorblockN{
+Marvin Kraus \quad Sebastian Nagles \quad Irmak Damla Özdemir \quad Manuel Stöth\\
+\quad Pascal Meißner
+}
+\IEEEauthorblockA{
+\{\emaillocal{marvin.kraus} \textbar~\emaillocal{sebastian.nagles} \textbar~\emaillocal{irmakdamla.oezdemir} \textbar~\emaillocal{manuel.stoeth}\}@\emaildomain\\
+\{\thwsemaillocal{pascal.meissner}\}@\thwsemaildomain\\
+\textit{Faculty of Computer Science and Business Information Systems (FIW)}\\
+\textit{Technical University of Applied Sciences Wuerzburg-Schweinfurt (THWS)}\\
+Sanderheinrichsleitenweg 20, 97074 Würzburg, Germany
+}
+}
+
+\newcommand{\sectionauthors}[1]{%
+    \par
+    \begin{center}
+        \vspace{-0.5em}
+        {\small\textit{Authors: #1}}
+        \vspace{-0.2em}
+    \end{center}
+}
+\begin{document}
+
+\maketitle
+\thispagestyle{plain}
+\pagestyle{plain}
+
+\begin{abstract}
+\input{subpapers/00_abstract}
+\end{abstract}
+
+\begin{IEEEkeywords}
+UR5e, Simulation, etc
+\end{IEEEkeywords}
+
+
+\chapterbreak
+\section{Simulation-based image generation}
+\sectionauthors{Manuel Stöth}
+\input{subpapers/01_manuel_stoeth}
+\chapterbreak
+
+\section{title}
+\sectionauthors{Sebastian Naglez}
+\input{subpapers/02_sebastian_naglez}
+\chapterbreak
+
+\section{title}
+\sectionauthors{Marvin Kraus}
+\input{subpapers/03_marvin_kraus}
+\chapterbreak
+
+\section{title}
+\sectionauthors{Irmak Damla Özdemir}
+\input{subpapers/04_irmak_damla_oezdemir}
+\chapterbreak
+
+\section{Conclusion}
+\input{subpapers/05_conclusion}
+
+\listoffigures
+
+\printbibliography
+
+\end{document}
