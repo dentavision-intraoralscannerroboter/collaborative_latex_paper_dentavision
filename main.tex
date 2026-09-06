@@ -34,6 +34,24 @@
 \usepackage{siunitx}
 \usepackage{caption}
 
+% Scanner and 3d reconstruction
+
+\usepackage[english]{babel}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\emergencystretch=4em
+\usepackage{seqsplit}
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{graphicx}
+% \usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{booktabs}
+
+
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\longcode}[1]{\texttt{\seqsplit{#1}}}
+
 % Command used in the PID section
 \newcommand{\source}[2][Source]{\vspace{-6pt} \caption*{#1: #2}}
 \newcommand{\R}{\mathbb{R}}
@@ -148,8 +166,8 @@ UR5e, Simulation, etc
 \input{subpapers/01_manuel_stoeth}
 \chapterbreak
 
-\section{title}
-\sectionauthors{Sebastian Naglez}
+\section{Image Acquisition and 3D Reconstruction}
+\sectionauthors{Sebastian Nagles}
 \input{subpapers/02_sebastian_nagles}
 \chapterbreak
 
