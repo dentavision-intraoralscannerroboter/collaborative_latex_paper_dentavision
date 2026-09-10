@@ -1,1 +1,1035 @@
-\subsection{Introduction}
+\subsection{3-D Registration}
+\label{sec:marvin-registration}
+
+\subsubsection{Einleitung und Zielsetzung}
+\label{sec:einleitung-und-zielsetzung}
+
+Ziel dieses Projektteils ist die robuste räumliche Registrierung mehrerer, sich überlappender 3-D-Punktwolken eines dentalen Objekts. Einzelne Aufnahmen oder Teilansichten liegen zunächst in unterschiedlichen lokalen Koordinatensystemen vor. Die Registrierung bestimmt starre Transformationen aus Rotation und Translation, mit denen die Fragmente in ein gemeinsames Referenzkoordinatensystem überführt werden. Das Ergebnis ist eine konsistente Gesamtpunktwolke, die als Eingangsdatenbasis für die anschließende Oberflächen- bzw. Mesh-Rekonstruktion dient.
+
+Der Schwerpunkt lag nicht nur auf der Implementierung eines einzelnen Algorithmus, sondern auf einem nachvollziehbaren Auswahlprozess. Dafür wurden fünf Verfahren unter kontrollierten synthetischen Bedingungen verglichen. Anschließend wurde ein Verfahren für die eigentliche Multiway-Registrierung festgelegt und auf einem aus vier Fragmenten bestehenden dentalähnlichen Testszenario mit bekannter Ground Truth validiert. Als Hauptverfahren wurde FPFH + Fast Global Registration (FGR) + Point-to-Plane ICP ausgewählt. FGR liefert eine globale Grobausrichtung ohne präzise Initialpose; Point-to-Plane ICP verfeinert diese anschließend lokal.
+
+Der Ablauf der Registrierung lässt sich wie folgt zusammenfassen. Zunächst werden die Punktwolken geladen und die Zuordnung/Koordinaten werden geprüft. Anschließend werden die Punktwolken Prepocessed. Es folgen grobe und feine Registrierung, sowie die Qualitätsprüfung. Abschließend werden die Punktwolken zusammengeführt und exportierbar gemacht.
+
+\paragraph{Abgrenzung zum nachfolgenden Projektteil (3-D Modellkonstruktion)}
+\label{sec:abgrenzung-zum-nachfolgenden-projektteil-3-d-modellkonstrukt}
+
+Der Projektteil der Registrierung endet mit der registrierten und zusammengeführten Punktwolke. Mesh-Erzeugung, Mesh-Bereinigung, Vereinfachung, Topologieanalyse und finaler Modell-Export bilden den zweiten Projektteil „3-D-Modellkonstruktion“, der ab Abschnitt 17 in derselben Dokumentation beschrieben wird. Die Datei combined\_cloud.ply bildet die technische Übergabeschnittstelle zwischen beiden Teilen.
+
+\subsubsection{Anforderungen und Systemgrenzen}
+\label{sec:anforderungen-und-systemgrenzen}
+
+Aus dem Projektablauf wurden für die Registrierung folgende funktionale Anforderungen abgeleitet:
+
+\begin{enumerate}
+\item Punktwolken laden und die Reihenfolge bzw. Zuordnung der Fragmente nachvollziehbar verwalten.
+\item Die Richtung der Transformationen eindeutig definieren und alle Fragmente in ein gemeinsames Koordinatensystem überführen.
+\item Punktwolken für die Registrierung vorbereiten, insbesondere durch Voxel-Downsampling und Normalenschätzung.
+\item Eine Grobregistrierung bereitstellen, die auch bei unbekannter oder deutlich abweichender Anfangspose arbeiten kann.
+\item Die Grobausrichtung durch ein lokales Verfahren präzisieren.
+\item Registrierungsergebnisse quantitativ und visuell prüfen.
+\item Mehr als zwei Fragmente über einen Pose Graph zusammenführen und global optimieren.
+\item Die registrierten Einzelwolken sowie eine zusammengeführte Gesamtpunktwolke reproduzierbar exportieren.
+\end{enumerate}
+
+Die aktuelle Validierung verwendet synthetische dentalähnliche Punktwolken, da dort die Ground-Truth-Transformationen bekannt sind. Dies ermöglicht eine objektive Messung des Transformationsfehlers. Reale Scandaten können später dieselbe Registrierungspipeline verwenden; bei realen Daten fehlt allerdings typischerweise eine exakte Ground Truth.
+
+\subsubsection{Technische Umgebung}
+\label{sec:technische-umgebung}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.28\columnwidth} X@{}}
+\toprule
+\textbf{Komponente} & \textbf{Verwendung} \\
+\midrule
+Python 3.12 & Implementierung der gesamten Pipeline \\
+Open3D 0.19.0 \cite{kraus_open3d019} & Punktwolken, ICP, FPFH, FGR, RANSAC, Pose Graph, Visualisierung \\
+NumPy & Matrizen, Transformationen, Fehlerberechnung \\
+SciPy & Numerische Hilfsfunktionen \\
+Pandas & Aufbereitung und Export der Experimentergebnisse \\
+Matplotlib & Auswertung und Diagramme \\
+Poetry & Abhängigkeits- und Umgebungsverwaltung \\
+Visual Studio Code & Entwicklungsumgebung \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Die Projektstruktur folgt einem Python-src-Layout mit dem Paket registration3d. Registrierungsalgorithmen, Preprocessing, Evaluation, Experimente und Multiway-Registrierung sind voneinander getrennt, um Modularität zu gewährleisten.
+
+\subsubsection{Theoretische Grundlagen der Registrierung}
+\label{sec:theoretische-grundlagen-der-registrierung}
+
+\paragraph{Starre 3-D-Transformation}
+\label{sec:starre-3-d-transformation}
+
+Für die betrachteten Punktwolken wird eine starre Transformation angenommen. Ein Punkt p der Quellpunktwolke wird mit einer Rotationsmatrix R und einem Translationsvektor t in das Zielkoordinatensystem überführt:
+
+\begin{equation}
+\mathbf{p}' = R\mathbf{p} + \mathbf{t}
+\end{equation}
+
+In homogenen Koordinaten wird diese Abbildung durch eine 4x4-Matrix T beschrieben. Die Transformationsrichtung wird im Projekt explizit als source $\rightarrow$ target geführt. Diese Festlegung ist bei der Multiway-Registrierung entscheidend, weil mehrere Transformationen miteinander verkettet und für die Knotenposen teilweise invertiert werden.
+
+\paragraph{Iterative Closest Point (ICP)}
+\label{sec:iterative-closest-point-icp}
+
+ICP ist ein lokales Registrierungsverfahren \cite{kraus_besl1992}. Ausgehend von einer Starttransformation werden wiederholt Korrespondenzen zwischen Quell- und Zielpunktwolke bestimmt und die Transformation so aktualisiert, dass ein Fehlermaß minimiert wird. ICP ist schnell und kann sehr präzise Ergebnisse liefern, besitzt jedoch nur einen begrenzten Konvergenzbereich. Bei einer schlechten Anfangspose kann es in einem lokalen Minimum konvergieren oder auf eine geometrisch falsche, aber lokal plausible Lösung treffen.
+
+\paragraph{Point-to-Point ICP}
+\label{sec:point-to-point-icp}
+
+Point-to-Point ICP minimiert die euklidischen Abstände zwischen korrespondierenden Punkten. Für Korrespondenzen (p\_i, q\_i) wird sinngemäß das folgende Kriterium minimiert:
+
+\begin{equation}
+E = \sum_i \left\|R\mathbf{p}_i + \mathbf{t} - \mathbf{q}_i\right\|^2
+\end{equation}
+
+Das Verfahren benötigt keine Normalen, ist einfach und robust implementierbar. Seine Genauigkeit und Konvergenzgeschwindigkeit hängen jedoch stark von den gefundenen Punktkorrespondenzen ab.
+
+\paragraph{Point-to-Plane ICP}
+\label{sec:point-to-plane-icp}
+
+Point-to-Plane ICP berücksichtigt zusätzlich die Oberflächennormale n\_i am Zielpunkt und minimiert nur die Fehlerkomponente in Normalenrichtung \cite{kraus_chen1992}:
+
+\begin{equation}
+E = \sum_i \left(\left(R\mathbf{p}_i + \mathbf{t} - \mathbf{q}_i\right)\cdot \mathbf{n}_i\right)^2
+\end{equation}
+
+Bei hinreichend guter Startausrichtung kann diese Form auf glatten Oberflächen schneller und geometrisch sinnvoller konvergieren. Deshalb wird sie im finalen Verfahren als Feinregistrierung eingesetzt.
+
+\paragraph{Generalized ICP}
+\label{sec:generalized-icp}
+
+Generalized ICP (GICP) verbindet Ideen aus Point-to-Point und Point-to-Plane \cite{kraus_segal2009}. Lokale Nachbarschaften werden als probabilistische Oberflächenmodelle bzw. Kovarianzen beschrieben. Dadurch kann die lokale Oberflächenstruktur stärker berücksichtigt werden. GICP ist weiterhin ein lokales Verfahren und benötigt daher grundsätzlich eine ausreichend gute Anfangsposition.
+
+\paragraph{FPFH-Merkmale}
+\label{sec:fpfh-merkmale}
+
+Fast Point Feature Histograms (FPFH) beschreiben die lokale Geometrie eines Punktes anhand von Winkelbeziehungen zwischen Normalen in seiner Nachbarschaft \cite{kraus_rusu2009}. Im Gegensatz zu reinen Punktabständen können solche Deskriptoren Korrespondenzen auch dann erzeugen, wenn zwei Punktwolken noch deutlich gegeneinander verschoben oder rotiert sind. Voraussetzung sind geschätzte Normalen und ein geeigneter Nachbarschaftsradius.
+
+\paragraph{RANSAC-basierte globale Registrierung}
+\label{sec:ransac-basierte-globale-registrierung}
+
+RANSAC zieht wiederholt Stichproben aus Feature-Korrespondenzen, erzeugt daraus Transformationshypothesen und bewertet diese. Das Verfahren kann große Ausgangsabweichungen überwinden, ist jedoch stochastisch und kann bei repetitiver Geometrie plausible, aber falsche Hypothesen finden. Eine hohe Fitness ist deshalb nicht automatisch ein Beleg für die korrekte Transformation.
+
+\paragraph{Fast Global Registration (FGR)}
+\label{sec:fast-global-registration-fgr}
+
+Fast Global Registration optimiert Feature-Korrespondenzen global, ohne die große Anzahl diskreter Hypothesentests eines klassischen RANSAC-Verfahrens zu benötigen \cite{kraus_zhou2016}. In diesem Projekt dient FGR als Grobausrichtung auf Basis von FPFH-Merkmalen. Die resultierende Transformation wird anschließend mit Point-to-Plane ICP verfeinert.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{assets/marvin/pairwise_pipeline.png}
+\caption{Pipeline des ausgewählten Pairwise-Verfahrens.}
+\label{fig:pipeline-des-ausgewaehlten-pairwise-verfahrens}
+\end{figure}
+
+\subsubsection{Softwarearchitektur}
+\label{sec:softwarearchitektur}
+
+Die Implementierung wurde modular aufgebaut. Alle Pairwise-Algorithmen folgen einer gemeinsamen Schnittstelle und liefern ein einheitliches RegistrationResult zurück. Dadurch kann der ExperimentRunner dieselben Daten mit verschiedenen Algorithmen verarbeiten, ohne für jedes Verfahren eine separate Auswertungslogik zu benötigen.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.36\columnwidth} >{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Modul / Klasse} & \textbf{Aufgabe} \\
+\midrule
+\longcode{RegistrationConfig} & Zentrale Parametrisierung von Downsampling, Normalen, FPFH, ICP, RANSAC, FGR und Evaluation. \\
+\longcode{PointCloudLoader} & Laden und Validieren von Punktwolken. \\
+\longcode{PointCloudPreprocessor} & Voxel-Downsampling und Normalenschätzung. \\
+\longcode{features.py} & Berechnung der FPFH-Deskriptoren. \\
+\longcode{RegistrationAlgorithm} & Gemeinsame Basisschnittstelle für Pairwise-Verfahren. \\
+\longcode{RegistrationResult} & Einheitlicher Rückgabewert für Transformation, Fitness, RMSE, Laufzeit und Fehlermaße. \\
+\longcode{RegistrationEvaluator} & Einheitliche quantitative Bewertung, optional gegen Ground Truth. \\
+\longcode{ExperimentRunner} & Erzeugung kontrollierter Szenarien, Ausführung aller Algorithmen, Reproduzierbarkeit und CSV-Export. \\
+\longcode{MultiwayRegistration} & Pose-Graph-Aufbau, Odometry-Kanten, globale Optimierung und Zusammenführung. \\
+\longcode{MultiwayEvaluator} & Vergleich der geschätzten Knotenposen mit Ground Truth. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{quote}
+\textbf{Entwurfsprinzip:}
+
+Preprocessing, Algorithmus und Evaluation sind getrennt. Damit kann die Qualität eines Verfahrens verglichen werden, ohne die Messlogik oder Datengenerierung zu verändern.
+\end{quote}
+
+\subsubsection{Vorverarbeitung der Punktwolken}
+\label{sec:vorverarbeitung-der-punktwolken}
+
+Das Preprocessing wird für die zu vergleichenden Verfahren zentral durchgeführt. Dadurch erhalten die Algorithmen möglichst identische Eingangsdaten.
+
+\begin{itemize}
+\item Voxel-Downsampling reduziert die Punktzahl und vereinheitlicht die räumliche Punktdichte. Die zentrale Voxelgröße beträgt 0,5.
+\item Die Normalen werden in einer lokalen Nachbarschaft geschätzt. Der Normalenradius beträgt das 2,0-Fache der Voxelgröße; maximal werden 30 Nachbarn verwendet.
+\item Für FPFH wird ein größerer Radius verwendet, damit ausreichend lokale Geometrie in den Deskriptor eingeht. Der FPFH-Radiusfaktor beträgt 5,0, maximal 100 Nachbarn.
+\item Korrespondenz- und Refinement-Distanzen werden relativ zur Voxelgröße definiert. Dadurch bleibt die Konfiguration skalierbar und zentral nachvollziehbar.
+\end{itemize}
+
+\paragraph{Parameterübersicht}
+\label{sec:parameteruebersicht}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.36\columnwidth} >{\centering\arraybackslash}p{0.14\columnwidth} >{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Parameter} & \textbf{Wert / Faktor} & \textbf{Bedeutung} \\
+\midrule
+\longcode{voxel\_size} & 0,5 & Downsampling-Auflösung \\
+\longcode{normal\_radius\_factor} & 2,0 & Radius für Normalenschätzung relativ zur Voxelgröße \\
+\longcode{max\_nn} & 30 & Maximale Nachbarn für Normalen \\
+\longcode{correspondence\_distance\_factor} & 2,0 & Korrespondenzdistanz für lokale Registrierung \\
+\longcode{max\_iterations} & 100 & Maximale ICP-Iterationen \\
+\longcode{fpfh\_radius\_factor} & 5,0 & FPFH-Nachbarschaft \\
+\longcode{fpfh\_max\_nn} & 100 & Maximale Nachbarn für FPFH \\
+\longcode{ransac\_distance\_factor} & 1,5 & RANSAC-Korrespondenzdistanz \\
+\longcode{ransac\_n} & 3 & Korrespondenzen pro RANSAC-Hypothese \\
+\longcode{ransac\_max\_iterations} & 100.000 & Maximale RANSAC-Iterationen \\
+\longcode{ransac\_confidence} & 0,999 & RANSAC-Konfidenz \\
+\longcode{fgr\_distance\_factor} & 0,5 & Max. Korrespondenzdistanz der FGR \\
+\longcode{refinement\_distance\_factor} & 0,4 & Distanz für Point-to-Plane-Refinement \\
+\longcode{evaluation\_distance\_factor} & 2,0 & Distanzschwelle der Evaluation \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Implementierte Registrierungsverfahren}
+\label{sec:implementierte-registrierungsverfahren}
+
+Für die algorithmische Auswahl wurden fünf Verfahren implementiert. Die ersten drei sind lokale Verfahren; die beiden letzten kombinieren globale Feature-Registrierung mit einem lokalen ICP-Refinement.
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Verfahren} & \textbf{Initialisierung} & \textbf{Besonderheiten} & \textbf{Typische Stärke} & \textbf{Typische Schwäche} \\
+\midrule
+Point-to-Point ICP & lokal & Punkt-Punkt-Fehler & einfach, schnell & kleiner Konvergenzbereich \\
+Point-to-Plane ICP & lokal & Normalenbasierter Fehler & präzise Feinregistrierung & benötigt Normalen und gute Startpose \\
+Generalized ICP & lokal & lokale Kovarianzen & gute lokale Oberflächenanpassung & weiterhin initialisierungsabhängig \\
+FPFH + RANSAC + ICP & global + lokal & Feature-Hypothesen + Refinement & große Ausgangsabweichungen & stochastisch, bei Symmetrien Fehlhypothesen \\
+FPFH + FGR + ICP & global + lokal & globale Feature-Optimierung + Refinement & schnelle Grobausrichtung + Präzision & Feature-Qualität und Überlappung kritisch \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\paragraph{Gemeinsamer Ablauf der Hybridverfahren}
+\label{sec:gemeinsamer-ablauf-der-hybridverfahren}
+
+1. Downsampling und Normalenschätzung
+
+2. FPFH-Berechnung für Source und Target
+
+3. Globale Grobregistrierung mit RANSAC oder FGR
+
+4. Übernahme der globalen Transformation als Initialisierung
+
+5. Point-to-Plane ICP als lokale Feinregistrierung
+
+6. Rückgabe der finalen Transformation und Qualitätskennzahlen
+
+\subsubsection{Evaluationsmethodik}
+\label{sec:evaluationsmethodik}
+
+\paragraph{Synthetische dentalähnliche Daten und Ground Truth}
+\label{sec:synthetische-dentalaehnliche-daten-und-ground-truth}
+
+Für den kontrollierten Vergleich wurde ein SyntheticDentalDataGenerator verwendet. Er erzeugt dentalähnliche Geometrien und dazu passende Source-/Target-Punktwolken mit bekannter Transformation. Damit kann nicht nur gemessen werden, wie gut die beiden Punktwolken nach der Registrierung übereinanderliegen, sondern auch, ob die geschätzte Transformation tatsächlich der bekannten Ground Truth entspricht.
+
+\paragraph{Kontrollierte Versuchsreihen}
+\label{sec:kontrollierte-versuchsreihen}
+
+Die vier Einflussgrößen Überlappung, Rotation, Translation und Rauschen wurden in getrennten Versuchsreihen variiert. Innerhalb einer Versuchsreihe werden reproduzierbare Seed-Bereiche verwendet. Dieselbe Wiederholungsnummer erhält für verschiedene Werte derselben Einflussgröße denselben Datensatz-Seed, damit sich möglichst nur die untersuchte Variable verändert. Zusätzlich erhalten stochastische Algorithmen reproduzierbare Algorithmus-Seeds.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.28\columnwidth} X@{}}
+\toprule
+\textbf{Versuchsreihe} & \textbf{Getestete Werte in der dokumentierten Auswertung} \\
+\midrule
+Overlap & 0,20; 0,30; 0,40; 0,50; 0,60; 0,70; 0,80 \\
+Rotation & 0\textdegree{}; 5\textdegree{}; 10\textdegree{}; 20\textdegree{}; 30\textdegree{}; 40\textdegree{}; 60\textdegree{} \\
+Translation & 0; 1; 2; 4; 6; 8; 12 \\
+Noise Std & 0; 0,01; 0,025; 0,05; 0,10; 0,20 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Die gespeicherte Zusammenfassung enthält Mittelwert und Standardabweichung der Messgrößen sowie die Erfolgsrate. Die Erfolgsentscheidung basiert auf getrennten Grenzwerten für Translations- und Rotationsfehler. Da diese Grenzwerte in der Konfiguration gekapselt sind, wird hier bewusst keine nicht verifizierte Zahl ergänzt.
+
+\paragraph{Bewertungsmetriken}
+\label{sec:bewertungsmetriken}
+
+\begin{itemize}
+\item Fitness: Anteil der Punkte, für die innerhalb der Bewertungsdistanz gültige Korrespondenzen gefunden werden.
+\item Inlier RMSE: quadratischer Mittelwert der Abstände der gültigen Korrespondenzen. Ein kleiner Wert ist günstig, muss jedoch zusammen mit Fitness und Transformationsfehler interpretiert werden.
+\item Translation Error: Abstand zwischen geschätzter und bekannter Ground-Truth-Translation.
+\item Rotation Error: Winkelabweichung zwischen geschätzter und Ground-Truth-Rotation in Grad.
+\item Runtime: Laufzeit des Registrierungsverfahrens im jeweiligen Test.
+\item Success Rate: Anteil der Wiederholungen, die gleichzeitig die vorgegebenen Translations- und Rotationsgrenzen erfüllen.
+\item 
+\end{itemize}
+
+\begin{quote}
+\textbf{Wichtige Schutzmaßnahme:}
+
+Wenn Open3D keine gültigen Korrespondenzen findet, kann Fitness = 0 und gleichzeitig RMSE = 0 auftreten. Im Experiment wird dieser RMSE deshalb als ungültig behandelt und nicht als perfektes Ergebnis interpretiert.
+\end{quote}
+
+\subsubsection{Ergebnisse der kontrollierten Pairwise-Experimente}
+\label{sec:ergebnisse-der-kontrollierten-pairwise-experimente}
+
+Die folgenden Abbildungen zeigen die Erfolgsraten der dokumentierten kontrollierten Auswertung. Die Resultate sind als Verhalten unter den konkreten synthetischen Testbedingungen zu verstehen und nicht als allgemeingültige Rangliste aller Registrierungsverfahren.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/noise_success_rate.png}
+\caption{Erfolgsrate in der Rausch-Versuchsreihe.}
+\label{fig:erfolgsrate-in-der-rausch-versuchsreihe}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/overlap_success_rate.png}
+\caption{Erfolgsrate in der Overlap-Versuchsreihe.}
+\label{fig:erfolgsrate-in-der-overlap-versuchsreihe}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/rotation_success_rate.png}
+\caption{Erfolgsrate in der Rotations-Versuchsreihe.}
+\label{fig:erfolgsrate-in-der-rotations-versuchsreihe}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/translation_success_rate.png}
+\caption{Erfolgsrate in der Translations-Versuchsreihe.}
+\label{fig:erfolgsrate-in-der-translations-versuchsreihe}
+\end{figure}
+
+\paragraph{Interpretation: Rauschen}
+\label{sec:interpretation-rauschen}
+
+Bis Noise Std = 0,05 blieb FPFH + FGR + ICP in der dokumentierten Auswertung erfolgreich. Bei stärkerem Rauschen sank die Zuverlässigkeit der globalen Feature-Verfahren deutlich; bei Noise Std = 0,20 scheiterten FGR und RANSAC in allen Wiederholungen. Die lokalen ICP-Varianten und GICP blieben in dieser isolierten Testreihe erfolgreich, wobei ihre Korrespondenzfehler mit zunehmendem Rauschen ebenfalls anstiegen. Das Ergebnis zeigt insbesondere die Empfindlichkeit der Feature-Beschreibung gegenüber stark verrauschter lokaler Geometrie.
+
+\paragraph{Interpretation: Überlappung}
+\label{sec:interpretation-ueberlappung}
+
+Bei niedrigen Überlappungsanteilen von 20 bis 50 \% waren die globalen FPFH-Verfahren in diesem dentalähnlichen Szenario deutlich instabiler. Erst ab etwa 60 \% Überlappung wurde FGR in der dokumentierten Auswertung zuverlässig. Die lokale Punktgeometrie des synthetischen Dentalmodells ist teilweise repetitiv, sodass Feature-Korrespondenzen bei geringem gemeinsamen Sichtbereich leicht mehrdeutig werden. Dass lokale ICP-Verfahren in dieser isolierten Versuchsreihe trotz niedriger Überlappung erfolgreich waren, darf nicht mit einer globalen Initialisierungsfähigkeit gleichgesetzt werden: Ihre Startlage war durch das jeweilige kontrollierte Szenario günstig genug für den lokalen Konvergenzbereich.
+
+\paragraph{Interpretation: Rotation und Translation}
+\label{sec:interpretation-rotation-und-translation}
+
+Die Rotationsreihe verdeutlicht den Nutzen einer globalen Initialisierung. FGR blieb bis 60\textdegree{} Rotation erfolgreich, während lokale Verfahren in einzelnen Konfigurationen aus ihrem Konvergenzbereich fielen. Auch bei großen Translationen zeigten die Feature-Verfahren einen deutlich größeren Erfassungsbereich. RANSAC war in der dokumentierten Translationsreihe besonders robust; FGR zeigte bei 6 und 8 Einheiten eine reduzierte Erfolgsrate. Diese Beobachtung wurde bei der finalen Auswahl gegen Laufzeit und Stochastik abgewogen.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/runtime_noise_zero.png}
+\caption{Beispielhafte Laufzeiten bei Noise = 0. Die absoluten Werte sind hardware- und datensatzabhängig.}
+\label{fig:beispielhafte-laufzeiten-bei-noise-0-die-absoluten-werte-sin}
+\end{figure}
+
+Die lokalen Verfahren sind erwartungsgemäß deutlich schneller, weil sie keine globale Feature-Zuordnung durchführen. Für eine reale Registrierung mit unbekannter Ausgangspose ist diese Geschwindigkeit jedoch nur nutzbar, wenn eine hinreichend gute Initialtransformation bereits vorliegt.
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Variable} & \textbf{FGR} & \textbf{RANSAC} & \textbf{GICP} & \textbf{P2Plane} & \textbf{P2Point} \\
+\midrule
+Noise 0,20 & 0 \% & 0 \% & 100 \% & 100 \% & 100 \% \\
+Overlap 0,20 & 0 \% & 0 \% & 0 \% & 100 \% & 100 \% \\
+Overlap 0,60 & 100 \% & 66,7 \% & 100 \% & 100 \% & 100 \% \\
+Rotation 60\textdegree{} & 100 \% & 66,7 \% & 0 \% & 100 \% & 0 \% \\
+Translation 8 & 66,7 \% & 100 \% & 0 \% & 0 \% & 0 \% \\
+Translation 12 & 100 \% & 100 \% & 0 \% & 0 \% & 0 \% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsubsection{Auswahl des finalen Pairwise-Verfahrens}
+\label{sec:auswahl-des-finalen-pairwise-verfahrens}
+
+Die Auswahl wurde nicht anhand einer einzelnen Kennzahl getroffen. Entscheidend war die Kombination aus globaler Initialisierungsfähigkeit, Genauigkeit nach lokaler Verfeinerung, Laufzeit, Robustheit und Integrationsfähigkeit in eine Multiway-Pipeline.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.28\columnwidth} X@{}}
+\toprule
+\textbf{Kriterium} & \textbf{Bewertung für FPFH + FGR + Point-to-Plane ICP} \\
+\midrule
+Unbekannte Startpose & Globale FPFH/FGR-Stufe kann größere Rotationen und Translationen überwinden. \\
+Feingenauigkeit & Point-to-Plane ICP verfeinert die globale Lösung lokal. \\
+Laufzeit & Deutlich höher als reines ICP, aber im Test typischerweise im Subsekundenbereich und damit für das Projekt praktikabel. \\
+Stochastik & Vorhanden bzw. abhängig von Korrespondenzen; reproduzierbare Seeds werden für kontrollierte Tests genutzt. \\
+Dentalähnliche Geometrie & Mehrdeutigkeiten sind möglich; deshalb werden Transformationsfehler und zusätzliche Plausibilitätsprüfungen benötigt. \\
+Multiway-Eignung & Einheitliche source $\rightarrow$ target-Transformation kann direkt als Pose-Graph-Odometry-Kante verwendet werden. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+RANSAC erzielte in Teilen der Translationsreihe bessere Erfolgsraten, zeigte jedoch in den Robustheitsanalysen eine ausgeprägte Abhängigkeit vom Zufallsseed und konnte auf der repetitiven dentalähnlichen Geometrie falsche Lösungen mit hoher Fitness erzeugen. FGR wurde daher als pragmatischer Kompromiss aus globaler Reichweite, Geschwindigkeit und nachfolgender ICP-Verfeinerung ausgewählt. Die Auswahl ist projektspezifisch und keine Behauptung einer universellen Überlegenheit von FGR.
+
+\begin{quote}
+\textbf{Ausgewählte Pipeline}
+
+FPFH-Merkmale $\rightarrow$ Fast Global Registration $\rightarrow$ Point-to-Plane ICP. Diese Pipeline wird im finalen Multiway-Baseline-Test unverändert als Pairwise-Algorithmus verwendet.
+\end{quote}
+
+\subsubsection{Multiway-Registrierung}
+\label{sec:multiway-registrierung}
+
+\paragraph{Ziel und Testdaten}
+\label{sec:ziel-und-testdaten}
+
+Nach der Pairwise-Auswahl wurde die Registrierung auf mehrere Fragmente erweitert. Der synthetische Multiway-Test besteht aus vier dentalähnlichen Punktwolken mit bekannter Ground Truth. Die Eingangspunktzahlen betragen 13.793, 15.302, 16.193 und 15.069 Punkte.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.28\columnwidth} X@{}}
+\toprule
+\textbf{Fragment} & \textbf{Punkte vor Multiway-Registrierung} \\
+\midrule
+0 & 13.793 \\
+1 & 15.302 \\
+2 & 16.193 \\
+3 & 15.069 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Transformationskonvention}
+\label{sec:transformationskonvention}
+
+Für ein beobachtetes Fragment i wird im synthetischen Test $x_i = A_i x_{\mathrm{world}}$ verwendet. Die Ground-Truth-Transformation von Fragment i nach Fragment j ergibt sich damit zu $A_j \cdot A_i^{-1}$. Die Knotenpose, mit der Fragment i in das globale Referenzsystem von Fragment 0 zurückgeführt wird, entspricht $A_i^{-1}$. Diese klare Unterscheidung verhindert typische Fehler durch vertauschte Transformationsrichtungen.
+
+\paragraph{Aufbau des Pose Graphs}
+\label{sec:aufbau-des-pose-graphs}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{assets/marvin/multiway_pose_graph.png}
+\caption{Sequenzielle Odometry-Kette der finalen Multiway-Baseline.}
+\label{fig:sequenzielle-odometry-kette-der-finalen-multiway-baseline}
+\end{figure}
+
+Fragment 0 ist der Referenzknoten mit Identitätsmatrix. Die final verwendete Baseline registriert sequenziell 0 $\rightarrow$ 1, 1 $\rightarrow$ 2 und 2 $\rightarrow$ 3. Die Pairwise-Transformationen werden kumuliert; für die Pose-Graph-Knoten wird die kumulierte Transformation invertiert, sodass jede Knotenpose das jeweilige Fragment in das Referenzkoordinatensystem abbildet. Zu jeder akzeptierten Odometry-Kante wird eine Information Matrix aus den Punktwolken und der geschätzten Transformation berechnet.
+
+\paragraph{Globale Pose-Graph-Optimierung}
+\label{sec:globale-pose-graph-optimierung}
+
+Der Pose Graph wird mit der Levenberg-Marquardt-Variante der globalen Open3D-Optimierung optimiert. Anschließend werden die optimierten Knotenposen auf die ursprünglichen Fragmente angewendet. Die transformierten Punktwolken werden zusammengeführt und für die Übergabe an die Modellrekonstruktion nochmals voxelbasiert zusammengefasst.
+
+Die finale FGR-Baseline deaktiviert Loop Closures bewusst. Damit wird die Leistung des ausgewählten Pairwise-Verfahrens entlang der Odometry-Kette isoliert gemessen, ohne dass eine zusätzliche Robustheitslogik das Ergebnis beeinflusst.
+
+\paragraph{Ergebnis des finalen Multiway-Baseline-Tests}
+\label{sec:ergebnis-des-finalen-multiway-baseline-tests}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.24\columnwidth} >{\raggedright\arraybackslash}p{0.18\columnwidth} X@{}}
+\toprule
+\textbf{Odometry-Kante} & \textbf{Fitness} & \textbf{Inlier RMSE} \\
+\midrule
+0 $\rightarrow$ 1 & 0,7397 & 0,2499 \\
+1 $\rightarrow$ 2 & 0,6904 & 0,2493 \\
+2 $\rightarrow$ 3 & 0,6676 & 0,2466 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\columnwidth}{@{}>{\centering\arraybackslash}p{0.18\columnwidth} >{\centering\arraybackslash}X >{\centering\arraybackslash}X@{}}
+\toprule
+\textbf{Fragment} & \textbf{\shortstack{Translations-\\fehler}} & \textbf{\shortstack{Rotations-\\fehler}} \\
+\midrule
+0 & 0,000000 & 0,000000\textdegree{} \\
+1 & 0,004240 & 0,006362\textdegree{} \\
+2 & 0,004678 & 0,035133\textdegree{} \\
+3 & 0,002682 & 0,026264\textdegree{} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Die geschätzten Knotenposen liegen im synthetischen Test sehr nahe an der Ground Truth. Nach Transformation und Zusammenführung enthält die Gesamtpunktwolke 22.022 Punkte. Sie wird unter output/multiway/fgr\_baseline/combined\_cloud.ply gespeichert und ist das zentrale Ergebnis der Registrierung.
+
+\begin{quote}
+\textbf{Bewertung:}
+
+Der Multiway-Test bestätigt, dass die ausgewählte FGR+ICP-Pipeline unter den kontrollierten Bedingungen nicht nur paarweise, sondern auch in einer sequenziellen Registrierungskette präzise arbeitet.
+\end{quote}
+
+\subsubsection{Robustheitsanalyse und verworfene Erweiterungen}
+\label{sec:robustheitsanalyse-und-verworfene-erweiterungen}
+
+Während der Entwicklung wurde zusätzlich untersucht, wie stark die globalen Verfahren von zufälligen Hypothesen bzw. Seed-Werten abhängen. Diese Arbeiten dienen der Robustheitsanalyse und sind ausdrücklich nicht Bestandteil des final ausgewählten Hauptalgorithmus.
+
+\paragraph{Multi-Start-Analyse}
+\label{sec:multi-start-analyse}
+
+In einer Erweiterung wurden pro Pairwise-Kante 20 FGR- und 20 RANSAC-Läufe mit Seeds 42 bis 61 erzeugt. Ähnliche Transformationen wurden geclustert und Kandidaten unter anderem anhand ihres medianen RMSE bewertet. Ziel war zu prüfen, ob wiederholte globale Registrierungen eine stabilere Auswahl ermöglichen.
+
+Ein Seed-Stabilitätstest für die Kante 0 $\rightarrow$ 1 zeigte exemplarisch, dass FGR in dieser speziellen Diagnose nur in 1 von 20 Läufen die Ground Truth traf, RANSAC in 6 von 20. Besonders wichtig war, dass mehrere falsche RANSAC-Lösungen trotzdem eine Fitness oberhalb von 0,90 erreichten. Damit wurde praktisch bestätigt, dass Fitness und Inlier-RMSE allein bei repetitiven Dentalstrukturen keine hinreichende Korrektheitsgarantie darstellen.
+
+\paragraph{Cycle Consistency und Loop Closures}
+\label{sec:cycle-consistency-und-loop-closures}
+
+Für nicht direkt benachbarte Fragmente wurde außerdem Cycle Consistency untersucht. Eine direkte Loop-Closure-Transformation wird dabei mit der aus der bereits aufgebauten Odometry-Kette vorhergesagten Transformation verglichen. Auf den untersuchten Loop-Kandidaten 0 $\rightarrow$ 2 und 1 $\rightarrow$ 3 bestanden zwar viele Kandidaten zunächst einfache Fitness-/RMSE-Prüfungen, aber keiner erfüllte die strengere Cycle-Consistency-Bedingung. Die Erweiterung wurde deshalb nicht in die finale Baseline übernommen.
+
+Cycle Consistency ist außerdem keine mathematische Garantie für eine korrekte globale Lösung: Eine in sich konsistente, aber insgesamt falsche Odometry-Kette kann prinzipiell ebenfalls konsistente Schleifen erzeugen. Ground Truth wurde in diesen Analysen ausschließlich zur nachträglichen Bewertung verwendet, nicht zur Auswahl einer Transformation.
+
+\subsubsection{Qualitätssicherung, Grenzen und Risiken}
+\label{sec:qualitaetssicherung-grenzen-und-risiken}
+
+\paragraph{Warum Fitness und RMSE nicht genügen}
+\label{sec:warum-fitness-und-rmse-nicht-genuegen}
+
+Fitness und Inlier-RMSE bewerten die geometrische Übereinstimmung der gefundenen Korrespondenzen, nicht die semantische Richtigkeit der Zuordnung. Bei ähnlichen Zähnen, wiederkehrenden Rundungen oder symmetrischen Flächen kann eine falsche Transformation viele nahe Punktpaare erzeugen. Deshalb werden in synthetischen Tests zusätzlich Translation Error und Rotation Error gegen die Ground Truth ausgewertet.
+
+\paragraph{Grenzen der synthetischen Validierung}
+\label{sec:grenzen-der-synthetischen-validierung}
+
+\begin{itemize}
+\item Die synthetische dentalähnliche Geometrie ist einfacher und regelmäßiger als reale intraorale Scans.
+\item Reale Aufnahmen können Okklusionen, Ausreißer, stark nichtuniforme Punktdichten, fehlende Bereiche, Gingiva-Strukturen und scannerabhängiges Rauschen enthalten.
+\item Die genaue Einheit bzw. Skala der späteren Realdaten muss bei voxel- und distanzabhängigen Parametern berücksichtigt werden.
+\item Ground Truth steht bei realen Datensätzen meist nicht zur Verfügung. Dann müssen Plausibilitäts- und Konsistenzprüfungen stärker gewichtet werden.
+\item Die finale Baseline nutzt keine Loop Closures. Bei langen Sequenzen kann sich dadurch Fehler kumulieren; für größere reale Datensätze sollte die Pose-Graph-Strategie erneut bewertet werden.
+\end{itemize}
+
+\paragraph{Offene Validierung mit realen Daten}
+\label{sec:offene-validierung-mit-realen-daten}
+
+Die aktuelle Implementierung ist auf kontrollierten synthetischen Daten validiert. Vor einer Aussage über die Robustheit auf realen dentalen Scans sollte die Pipeline mit realistisch fragmentierten oder tatsächlich aufgenommenen Dentalpunktwolken getestet werden. Besonders relevant sind geringe Überlappung, nichtuniforme Punktdichte, Scannerrauschen und mehrdeutige Zahngeometrien.
+
+\subsubsection{Reproduzierbarkeit und Ausführung}
+\label{sec:reproduzierbarkeit-und-ausfuehrung}
+
+Die folgenden Befehle werden im Projektverzeichnis in der Poetry-Umgebung ausgeführt:
+
+\begin{itemize}[leftmargin=*]
+\item Pairwise-Demonstration: \texttt{poetry run python -m }\longcode{registration3d.main}
+\item Kontrollierte Experimente: \texttt{poetry run python -m }\longcode{registration3d.experiment\_main}
+\item Ergebnisplots: \texttt{poetry run python -m }\longcode{registration3d.plot\_results}
+\item Finale Multiway-Registrierung: \texttt{poetry run python -m }\longcode{registration3d.multiway\_main}
+\end{itemize}
+
+Für reproduzierbare Tests werden feste Seeds verwendet. Besonders bei globalen Feature-Verfahren ist dies wichtig, weil stochastische Schritte sonst von Lauf zu Lauf unterschiedliche Hypothesen liefern können.
+
+\paragraph{Relevante Eingaben}
+\label{sec:relevante-eingaben}
+
+\begin{itemize}
+\item \path{data/multiway_test/fragment_*.ply} - synthetische Multiway-Fragmente
+\item \path{data/multiway_test/ground_truth_poses.npy} - bekannte Posen für die synthetische Evaluation
+\end{itemize}
+
+\paragraph{Relevante Ausgaben}
+\label{sec:relevante-ausgaben}
+
+\begin{itemize}
+\item \path{output/controlled_experiments/experiments_raw.csv} - Einzelmessungen
+\item \path{output/controlled_experiments/experiments_summary.csv} - aggregierte Kennzahlen
+\item \path{output/multiway/fgr_baseline/registered_fragment_XX.ply} - registrierte Einzelwolken
+\item \path{output/multiway/fgr_baseline/pose_errors.csv} - Pose-Fehler gegen Ground Truth
+\item \path{output/multiway/fgr_baseline/combined_cloud.ply} - registrierte Gesamtpunktwolke
+\end{itemize}
+
+\subsubsection{Ergebnis und Übergabe an die 3-D-Modellrekonstruktion}
+\label{sec:ergebnis-und-uebergabe-an-die-3-d-modellrekonstruktion}
+
+Der Registrierungsteil liefert als finales Datenprodukt eine zusammengeführte Punktwolke im gemeinsamen Referenzkoordinatensystem. Im aktuellen kontrollierten Multiway-Test umfasst diese 22.022 Punkte. Die registrierten Einzelwolken bleiben zusätzlich separat gespeichert, sodass spätere Fehleranalysen oder Visualisierungen weiterhin möglich sind.
+
+Die Mesh-Rekonstruktion liest anschließend direkt output/multiway/fgr\_baseline/combined\_cloud.ply. Damit besteht eine klare Schnittstelle: Der Registrierungsteil ist für die räumliche Konsistenz der Messpunkte verantwortlich; der Modellierungsteil rekonstruiert daraus eine Oberfläche und behandelt Mesh-spezifische Artefakte und Topologieprobleme.
+
+\subsubsection{Fazit der Registrierung}
+\label{sec:fazit-der-registrierung}
+
+Für die Registrierung wurde eine vollständige, modular aufgebaute Pipeline implementiert und experimentell untersucht. Fünf Registrierungsverfahren wurden unter kontrollierten Variationen von Überlappung, Rotation, Translation und Rauschen verglichen. Die Experimente zeigen den erwartbaren Zielkonflikt: lokale ICP-Verfahren sind schnell und bei guter Initialisierung sehr präzise, besitzen jedoch einen begrenzten Erfassungsbereich; globale Feature-Verfahren können größere Ausgangsabweichungen überwinden, sind dafür empfindlicher gegenüber mehrdeutigen Merkmalen, geringer Überlappung und stochastischen Effekten.
+
+Als finaler Pairwise-Algorithmus wurde FPFH + Fast Global Registration + Point-to-Plane ICP ausgewählt. Die globale FGR-Stufe adressiert die fehlende Initialpose, während ICP die Lösung lokal verfeinert. In einer Multiway-Baseline mit vier Fragmenten wurden sehr geringe Posefehler gegenüber der synthetischen Ground Truth erreicht. Das resultierende combined\_cloud.ply bildet damit eine geeignete, nachvollziehbar validierte Übergabe an den anschließenden 3-D-Modellteil.
+
+Gleichzeitig wurden Grenzen der rein geometrischen Qualitätsmetriken sichtbar. Insbesondere bei repetitiver dentaler Geometrie kann eine falsche Transformation hohe Fitness erreichen. Die Robustheitsanalysen sind deshalb ein wichtiger Teil der Projekterkenntnisse und begründen, warum reale Scandaten abschließend separat validiert werden müssen.
+
+\subsection{3-D Model Construction}
+\label{sec:marvin-model-construction}
+
+\subsubsection{Zielsetzung und Ablauf}
+\label{sec:3-d-modellkonstruktion-zielsetzung-und-ablauf}
+
+Der 3-D-Modellkonstruktions Projektteil baut direkt auf dem Ergebnis der Registrierung auf. Eingabe ist die unter output/multiway/fgr\_baseline/combined\_cloud.ply gespeicherte Gesamtpunktwolke mit 22.022 Punkten. Ziel ist die Rekonstruktion einer expliziten Dreiecksoberfläche, deren Geometrie die registrierten Messpunkte möglichst gut repräsentiert, die für weitere Verarbeitung handhabbar bleibt und in gebräuchlichen Formaten exportiert werden kann.
+
+Die Modellkonstruktion wurde erneut als Auswahl- und Validierungsprozess umgesetzt. Zunächst wurden Poisson Surface Reconstruction und Ball Pivoting gegenübergestellt. Für das geeignetere Verfahren wurden anschließend Parameter, Komponentenstruktur, Topologie, Vereinfachung und Export systematisch untersucht.
+
+\begin{quote}
+\textbf{Finale Entscheidung}
+
+Für den aktuellen synthetischen Dentaldatensatz wurde Ball Pivoting mit Radienfaktoren (1,0; 1,5; 2,0) ausgewählt. Nach Cleanup und einer konservativen Vereinfachung umfasst das finale Modell 16.649 Vertices und 29.998 Dreiecke. Es wird sowohl als PLY als auch als STL exportiert.
+\end{quote}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{assets/marvin/model_construction_pipeline.png}
+\caption{Gesamtprozess der 3-D-Modellkonstruktion.}
+\label{fig:gesamtprozess-der-3-d-modellkonstruktion}
+\end{figure}
+
+\paragraph{Funktionale Anforderungen}
+\label{sec:funktionale-anforderungen}
+
+1. Die registrierte Gesamtpunktwolke ohne manuelle Zwischenschritte als Eingang übernehmen.
+
+2. Für die Oberflächenrekonstruktion erforderliche Normalen reproduzierbar schätzen und orientieren.
+
+3. Mindestens zwei Rekonstruktionsverfahren anhand identischer Eingangsdaten vergleichen.
+
+4. Geometrische Qualität in beide Richtungen Punktwolke $\rightarrow$ Mesh und Mesh $\rightarrow$ Punktwolke bewerten.
+
+5. Artefakte und isolierte Kleinkomponenten nachvollziehbar bereinigen.
+
+6. Topologische Eigenschaften explizit analysieren, statt sie nur visuell zu beurteilen.
+
+7. Den Polygonumfang kontrolliert reduzieren und den Qualitätsverlust quantifizieren.
+
+8. Das finale Modell in PLY und STL exportieren und durch erneutes Einlesen auf Integrität prüfen.
+
+\subsubsection{Theoretische Grundlagen der Oberflächenrekonstruktion}
+\label{sec:theoretische-grundlagen-der-oberflaechenrekonstruktion}
+
+\paragraph{Von der Punktwolke zum Dreiecksmesh}
+\label{sec:von-der-punktwolke-zum-dreiecksmesh}
+
+Eine Punktwolke beschreibt nur diskrete räumliche Messpunkte. Für viele nachfolgende Anwendungen wird dagegen eine explizite Oberfläche benötigt. Ein Dreiecksmesh besteht aus Vertices und Dreiecken, die über gemeinsame Vertex-Indizes verbunden sind. Die Rekonstruktion muss daher aus lokalen Punktnachbarschaften eine plausible Flächenkonnektivität ableiten. Dabei besteht ein Zielkonflikt zwischen Flächenvollständigkeit und dem Risiko, nicht beobachtete Geometrie künstlich zu ergänzen.
+
+\paragraph{Normalenschätzung}
+\label{sec:normalenschaetzung}
+
+Sowohl Poisson Surface Reconstruction als auch Ball Pivoting benötigen orientierte Oberflächennormalen. Im Modellteil wird zunächst der mittlere Abstand jedes Punktes zu seinem nächsten Nachbarn bestimmt. Der Normalenradius wird relativ zu diesem Abstand gewählt. In der final verwendeten Konfiguration beträgt der Radius das 3,0-Fache des mittleren Punktabstands; maximal werden 50 Nachbarn berücksichtigt. Anschließend werden die Normalen über konsistente Tangentialebenen ausgerichtet und normalisiert.
+
+\paragraph{Poisson Surface Reconstruction}
+\label{sec:poisson-surface-reconstruction}
+
+Poisson Surface Reconstruction interpretiert orientierte Punkte als Stichproben eines Vektorfeldes und rekonstruiert eine implizite Funktion, deren Isofläche die Oberfläche beschreibt \cite{kraus_kazhdan2006}. Das Verfahren erzeugt typischerweise eine glatte und weitgehend geschlossene Oberfläche. Gerade bei unvollständigen Scans kann diese Eigenschaft jedoch problematisch sein: Fehlende Messbereiche können durch großflächige interpolierte Flächen überbrückt werden. Im Projekt wird Poisson mit Depth = 9 verwendet und anschließend werden die 2 \% der Vertices mit der niedrigsten rekonstruktionsinternen Dichte entfernt.
+
+\paragraph{Ball Pivoting}
+\label{sec:ball-pivoting}
+
+Der Ball-Pivoting-Algorithmus konstruiert Dreiecke, indem gedanklich eine Kugel mit vorgegebenem Radius über die Punktwolke gerollt wird \cite{kraus_bernardini1999}. Berührt die Kugel drei geeignete Punkte, kann zwischen ihnen ein Dreieck erzeugt werden. Mehrere Radien erlauben, sowohl dichtere als auch etwas gröbere Punktabstände abzudecken. Im Gegensatz zu Poisson neigt Ball Pivoting weniger dazu, große nicht beobachtete Bereiche künstlich zu schließen, kann dafür aber offene Ränder und mehrere Komponenten hinterlassen.
+
+\paragraph{Qualitätsmetriken für rekonstruierte Oberflächen}
+\label{sec:qualitaetsmetriken-fuer-rekonstruierte-oberflaechen}
+
+Die geometrische Evaluation erfolgt approximativ über 100.000 gleichmäßig auf dem Mesh gesampelte Punkte. Es werden zwei Richtungen betrachtet: Punktwolke $\rightarrow$ Mesh prüft, wie gut die Messpunkte von der rekonstruierten Oberfläche abgedeckt werden; Mesh $\rightarrow$ Punktwolke prüft, ob die erzeugte Oberfläche in Bereichen liegt, für die überhaupt Messpunkte vorliegen. Gerade die zweite Richtung ist wichtig, um künstlich ergänzte Flächen zu erkennen. Aus beiden Richtungen werden Mittelwert, Median, RMSE, 95\%-Quantil und Maximum ermittelt; zusätzlich werden symmetrischer Mittelwert und symmetrischer RMSE berechnet.
+
+Die Distanz ist eine Sampling-basierte Approximation und keine exakte Punkt-zu-Dreieck-Distanz. Für relative Vergleiche innerhalb derselben Pipeline ist sie dennoch geeignet, sofern Sampling-Größe und Zufallsseed konstant gehalten werden.
+
+\subsubsection{Softwarearchitektur des Modellteils}
+\label{sec:softwarearchitektur-des-modellteils}
+
+Der Modellteil wurde im bestehenden Paket registration3d als eigenes Unterpaket reconstruction ergänzt. Dadurch bleibt die Schnittstelle zur Registrierung direkt erhalten, während rekonstruktionsspezifische Konfiguration, Evaluation und Cleanup logisch getrennt sind.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.38\columnwidth} >{\raggedright\arraybackslash}X@{}}
+\toprule
+\textbf{Modul / Klasse} & \textbf{Aufgabe} \\
+\midrule
+\longcode{mesh\_config.py}\\MeshConfig & Zentrale Parameter für Normalen, Poisson, Ball Pivoting, Cleanup, Vereinfachung und Evaluation. \\
+\longcode{mesh\_reconstruction.py}\\MeshReconstructor & Normalenvorbereitung sowie Poisson- und Ball-Pivoting-Rekonstruktion. \\
+\longcode{mesh\_cleanup.py}\\MeshCleaner & Entfernen von Duplikaten, degenerierten Elementen, unreferenzierten Vertices und Kleinkomponenten. \\
+\longcode{mesh\_evaluator.py}\\MeshEvaluator & Geometrische und topologische Bewertung des Meshes. \\
+\longcode{component\_analysis.py} & Analyse der Größenverteilung verbundener Mesh-Komponenten. \\
+\longcode{mesh\_topology\_analysis.py} & Analyse von Boundary Edges, Non-Manifold Edges/Vertices und Orientierbarkeit. \\
+\longcode{mesh\_simplification\_experiment.py} & Kontrollierter Vergleich verschiedener Ziel-Dreiecksanzahlen. \\
+\longcode{final\_mesh\_export.py} & Finaler Cleanup, Evaluation, PLY/STL-Export und Integritätsprüfung. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{quote}
+\textbf{Entwurfsprinzip:} Rekonstruktion, Cleanup und Evaluation bleiben getrennt. Dadurch können Verfahren und Parameter ausgetauscht werden, ohne die Qualitätsmessung zu verändern.
+\end{quote}
+
+\subsubsection{Vergleich von Poisson und Ball Pivoting}
+\label{sec:vergleich-von-poisson-und-ball-pivoting}
+
+\paragraph{Gemeinsame Eingangsdaten}
+\label{sec:gemeinsame-eingangsdaten}
+
+Beide Verfahren erhalten dieselbe registrierte Gesamtpunktwolke mit 22.022 Punkten und dieselbe vorbereitete Normaleninformation. Der mittlere Punktabstand beträgt 0,164920; daraus ergibt sich bei einem Normalenradiusfaktor von 3,0 ein Radius von 0,494760.
+
+\paragraph{Poisson-Ergebnis}
+\label{sec:poisson-ergebnis}
+
+Poisson erzeugte zunächst 77.259 Vertices und 154.662 Dreiecke. Nach dem Entfernen der niedrigsten 2 \% der Dichtewerte verblieben 75.713 Vertices und 151.430 Dreiecke. Die geometrische Evaluation zeigte eine noch moderate Punktwolke $\rightarrow$ Mesh-Abweichung, jedoch eine sehr große Mesh $\rightarrow$ Punktwolke-Abweichung. Dies ist ein Hinweis darauf, dass Poisson große Flächen erzeugte, für die in der Eingabepunktwolke keine nahe Stützung vorhanden war. Zusätzlich war das Mesh nicht edge-manifold, selbstüberschneidend und nicht orientierbar.
+
+\paragraph{Ball-Pivoting-Ergebnis}
+\label{sec:ball-pivoting-ergebnis}
+
+Mit den zunächst verwendeten Radienfaktoren (1,5; 2,0; 3,0) erzeugte Ball Pivoting 22.022 Vertices und 41.237 Dreiecke. Bereits diese Baseline lag geometrisch deutlich näher an der Punktwolke und erzeugte keine Self-Intersections. Die spätere Parameterstudie verbesserte das Ergebnis weiter.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}X >{\centering\arraybackslash}p{0.19\columnwidth} >{\centering\arraybackslash}p{0.24\columnwidth}@{}}
+\toprule
+\textbf{Kennzahl} & \textbf{Poisson} & \textbf{\shortstack{Ball Pivoting\\(bereinigt)}} \\
+\midrule
+Vertices & 75.713 & 21.689 \\
+Dreiecke & 151.430 & 40.020 \\
+Connected Components & 17 & 1 \\
+Edge Manifold (Boundary erlaubt) & False & True \\
+Vertex Manifold & False & False \\
+Self Intersecting & True & False \\
+Watertight & False & False \\
+Orientable & False & False \\
+Cloud $\rightarrow$ Mesh RMSE & 0,122208 & 0,076404 \\
+Mesh $\rightarrow$ Cloud RMSE & 2,741374 & 0,115709 \\
+Symmetrischer RMSE & 1,940369 & 0,098046 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/poisson_vs_ball_pivoting_rmse.png}
+\caption{Vergleich der geometrischen RMSE-Werte von Poisson und Ball Pivoting.}
+\label{fig:vergleich-der-geometrischen-rmse-werte-von-poisson-und-ball-}
+\end{figure}
+
+\begin{quote}
+\textbf{Auswahlentscheidung}
+
+Für den aktuellen synthetischen Datensatz wurde Ball Pivoting ausgewählt. Ausschlaggebend war nicht nur der niedrigere symmetrische RMSE, sondern insbesondere der sehr viel kleinere Mesh $\rightarrow$ Punktwolke-Fehler sowie das Ausbleiben von Self-Intersections. Die Entscheidung ist datensatzspezifisch und stellt keine universelle Überlegenheit von Ball Pivoting dar.
+\end{quote}
+
+\subsubsection{Parameterstudie für Ball Pivoting}
+\label{sec:parameterstudie-fuer-ball-pivoting}
+
+Da Ball Pivoting stark von den verwendeten Kugelradien abhängt, wurden vier Konfigurationen relativ zum mittleren Punktabstand verglichen. Für alle Varianten wurden identische Eingangsdaten, Normalen und Evaluationsparameter verwendet.
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Konfiguration} & \textbf{Radienfaktoren} & \textbf{Connected Components} & \textbf{Größte Komponente} & \textbf{Sym. RMSE} \\
+\midrule
+A\_small & (1,0; 1,5; 2,0) & 82 & 99,04 \% & 0,094492 \\
+B\_baseline & (1,5; 2,0; 3,0) & 14 & 45,56 \% & 0,097014 \\
+C\_medium & (2,0; 3,0; 4,0) & 11 & 19,25 \% & 0,103000 \\
+D\_large & (2,5; 4,0; 6,0) & 11 & 19,36 \% & 0,113160 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/bpa_parameter_study.png}
+\caption{BPA-Parameterstudie. Niedrigerer RMSE ist günstig; die Komponentenanzahl wird separat interpretiert.}
+\label{fig:bpa-parameterstudie-niedrigerer-rmse-ist-guenstig-die-kompon}
+\end{figure}
+
+A\_small besitzt zwar zunächst 82 Connected Components, gleichzeitig liegen aber 99,04 \% aller Dreiecke in einer einzigen Hauptkomponente. Die hohe Komponentenanzahl entsteht daher überwiegend durch sehr kleine Satellitenkomponenten und ist nicht mit einer starken Fragmentierung der Hauptoberfläche gleichzusetzen. Da A\_small zugleich den geringsten symmetrischen RMSE zeigte, wurde diese Konfiguration für den weiteren Pipeline-Verlauf gewählt.
+
+\subsubsection{Mesh-Bereinigung und Komponentenanalyse}
+\label{sec:mesh-bereinigung-und-komponentenanalyse}
+
+\paragraph{Basis-Cleanup}
+\label{sec:basis-cleanup}
+
+Nach der Rekonstruktion werden doppelte Vertices und Dreiecke, degenerierte Dreiecke sowie unreferenzierte Vertices entfernt. Beim A\_small-Mesh wurden keine doppelten oder degenerierten Elemente gefunden; 108 unreferenzierte Vertices konnten entfernt werden. Die Dreiecksanzahl blieb bei 40.409.
+
+\paragraph{Analyse der 82 Komponenten}
+\label{sec:analyse-der-82-komponenten}
+
+Vor einem automatischen Komponentenfilter wurde die Größenverteilung explizit untersucht. Die Hauptkomponente enthielt 40.020 von 40.409 Dreiecken und damit 99,037 \% des gesamten Meshes. Die zweitgrößte Komponente umfasste nur 104 Dreiecke; alle 81 Nebenkomponenten zusammen enthielten 389 Dreiecke bzw. 0,963 \% des Meshes.
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccc}
+\toprule
+\textbf{Bereich} & \textbf{Komponenten} & \textbf{Dreiecke} & \textbf{Anteil am Mesh} \\
+\midrule
+Hauptkomponente & 1 & 40.020 & 99,037 \% \\
+Alle Nebenkomponenten & 81 & 389 & 0,963 \% \\
+Komponenten < 100 Dreiecke & 80 & 285 & 0,705 \% \\
+Komponenten < 250 Dreiecke & 81 & 389 & 0,963 \% \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Auf Grundlage dieser Verteilung wurde für den synthetischen Test ein Schwellenwert von 250 Dreiecken verwendet. Damit wurden exakt die 81 kleinen Satellitenkomponenten entfernt. Das Ergebnis besitzt 21.689 Vertices, 40.020 Dreiecke und genau eine Connected Component. Der Schwellenwert wird ausdrücklich nicht als universelle Regel für reale Dentaldaten betrachtet.
+
+\begin{quote}
+\textbf{Ergebnis nach Komponenten-Cleanup}
+
+1 Connected Component, Edge Manifold mit erlaubten Rändern = True, Self Intersecting = False, symmetrischer RMSE = 0,098046. Die Geometrie blieb damit trotz Entfernung der Kleinkomponenten praktisch erhalten.
+\end{quote}
+
+\subsubsection{Topologieanalyse und Reparaturversuch}
+\label{sec:topologieanalyse-und-reparaturversuch}
+
+\paragraph{Diagnose des finalen BPA-Kandidaten}
+\label{sec:diagnose-des-finalen-bpa-kandidaten}
+
+Das bereinigte BPA-Mesh ist edge-manifold, solange offene Ränder zugelassen werden, jedoch nicht vertex-manifold, nicht watertight und nicht orientierbar. Eine detaillierte Diagnose ergab 0 echte Non-Manifold Edges, 7.982 Boundary Edges und 1.204 Non-Manifold Vertices. Die problematischen Vertices entsprechen 5,5512 \% aller Vertices. Self-Intersection-Paare wurden im Originalmesh nicht gefunden.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.55\columnwidth} X@{}}
+\toprule
+\textbf{Topologiekennzahl} & \textbf{Wert} \\
+\midrule
+Echte Non-Manifold Edges & 0 \\
+Boundary Edges & 7.982 \\
+Non-Manifold Vertices & 1.204 (5,5512 \%) \\
+Self-Intersection-Paare & 0 \\
+Edge Manifold, Boundary erlaubt & True \\
+Vertex Manifold & False \\
+Watertight & False \\
+Orientable & False \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Orientierbarkeitsanalyse}
+\label{sec:orientierbarkeitsanalyse}
+
+Eine zusätzliche Analyse des Triangle-Adjazenzgraphen identifizierte 420 Orientierungs-Konfliktkanten und 784 betroffene Dreiecke. Das entspricht 1,959 \% aller Dreiecke. Die Konflikte sind räumlich über mehrere Übergangs- und Randbereiche verteilt und bilden keine einzelne isolierte Defektzone.
+
+\paragraph{Verworfener Vertex-Splitting-Versuch}
+\label{sec:verworfener-vertex-splitting-versuch}
+
+Als Reparaturversuch wurden Non-Manifold Vertices topologisch aufgespalten, ohne ihre räumlichen Koordinaten zu verschieben. Dadurch sank die Zahl der Non-Manifold Vertices von 1.204 auf 0 und Vertex Manifold wurde True. Gleichzeitig erkannte Open3D danach jedoch Self-Intersections, und das Mesh blieb nicht orientierbar. Die geometrische Distanz änderte sich erwartungsgemäß kaum (symmetrischer RMSE 0,098070). Da die Reparatur ein neues Qualitätsproblem erzeugte, wurde sie verworfen und nicht in die finale Pipeline übernommen.
+
+\begin{quote}
+\textbf{Entscheidung zur Topologie}
+
+Als finale Basis bleibt das geometrisch unveränderte BPA-Mesh mit 0 echten Non-Manifold Edges und 0 Self-Intersections erhalten. Offene Ränder, nicht vollständige Vertex-Manifoldness und fehlende Orientierbarkeit werden als dokumentierte Limitation der aktuellen synthetischen Rekonstruktionsoberfläche behandelt, statt durch aggressive Reparaturen künstlich kaschiert zu werden.
+\end{quote}
+
+\subsubsection{Mesh-Vereinfachung}
+\label{sec:mesh-vereinfachung}
+
+Zur Reduktion der Modellkomplexität wurde Quadric Decimation mit mehreren Zielgrößen getestet \cite{kraus_garland1997}. Bewertet wurden neben dem geometrischen Fehler auch Connected Components und Self-Intersections. Das Originalmesh besitzt 40.020 Dreiecke.
+
+\begin{table}[H]
+\centering
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Variante} & \textbf{Dreiecke} & \textbf{Reduktion} & \textbf{Komponenten} & \textbf{Self Intersecting} & \textbf{Sym. RMSE} \\
+\midrule
+Original & 40.020 & 0,00 \% & 1 & False & 0,098070 \\
+Target 30.000 & 29.999 & 25,04 \% & 2 & False & 0,098195 \\
+Target 20.000 & 20.000 & 50,02 \% & 19 & True & 0,098727 \\
+Target 10.000 & 10.000 & 75,01 \% & 78 & False & 0,100504 \\
+Target 5.000 & 4.999 & 87,51 \% & 46 & False & 0,103913 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\linewidth]{assets/marvin/mesh_simplification_study.png}
+\caption{Geometrischer Fehler und Komponentenanzahl bei zunehmender Vereinfachung.}
+\label{fig:geometrischer-fehler-und-komponentenanzahl-bei-zunehmender-v}
+\end{figure}
+
+Die 30k-Variante ist der beste Kompromiss. Sie reduziert die Dreiecksanzahl um etwa ein Viertel, während der symmetrische RMSE nur von 0,098070 auf 0,098195 steigt. Die zweite Komponente dieser Variante besteht aus nur einem isolierten Dreieck. Bei 20.000 Dreiecken treten bereits Self-Intersections und 19 Komponenten auf; bei 10.000 bzw. 5.000 Dreiecken wird die Oberfläche stark fragmentiert. Daher wurde Target 30.000 ausgewählt.
+
+\subsubsection{Finaler Export und Integritätsprüfung}
+\label{sec:finaler-export-und-integritaetspruefung}
+
+\paragraph{Letzter Cleanup}
+\label{sec:letzter-cleanup}
+
+Aus der 30k-Variante wurde vor dem Export die einzelne Kleinkomponente mit einem Dreieck entfernt. Das finale Mesh besitzt dadurch 16.649 Vertices, 29.998 Dreiecke und genau eine Connected Component. Das entspricht einer Reduktion der Dreiecksanzahl um 25,04 \% gegenüber dem bereinigten BPA-Ausgangsmesh.
+
+\paragraph{Finale Qualitätsprüfung}
+\label{sec:finale-qualitaetspruefung}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\columnwidth}{@{}>{\raggedright\arraybackslash}p{0.24\columnwidth} >{\raggedright\arraybackslash}p{0.18\columnwidth} X@{}}
+\toprule
+\textbf{Kennzahl} & \textbf{Original BPA} & \textbf{Finales Modell} \\
+\midrule
+Vertices & 21.689 & 16.649 \\
+Dreiecke & 40.020 & 29.998 \\
+Connected Components & 1 & 1 \\
+Edge Manifold (Boundary erlaubt) & True & True \\
+Vertex Manifold & False & False \\
+Self Intersecting & False & False \\
+Watertight & False & False \\
+Orientable & False & False \\
+Cloud $\rightarrow$ Mesh RMSE & 0,076592 & 0,076915 \\
+Mesh $\rightarrow$ Cloud RMSE & 0,115624 & 0,115695 \\
+Symmetrischer RMSE & 0,098070 & 0,098237 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Der symmetrische RMSE steigt durch die Vereinfachung und den letzten Cleanup lediglich um 0,000168 bzw. 0,171 \%. Damit wird die Modellkomplexität deutlich reduziert, ohne die geometrische Approximation relevant zu verschlechtern.
+
+\paragraph{PLY- und STL-Export}
+\label{sec:ply-und-stl-export}
+
+Das finale Mesh wird binär als dental\_model\_final.ply und dental\_model\_final.stl gespeichert. Zusätzlich wird dental\_model\_full\_resolution.ply als nicht vereinfachte Referenz archiviert. Beide Exportdateien werden anschließend erneut mit Open3D eingelesen. PLY enthält nach dem Wiedereinlesen 16.649 Vertices und 29.998 Dreiecke. STL enthält ebenfalls 29.998 Dreiecke, jedoch 89.992 gelesene Vertices. Dies ist erwartbar, weil das STL-Format keine gemeinsame indexierte Vertex-Konnektivität wie PLY speichert und Dreiecksvertices beim Import entsprechend mehrfach auftreten können.
+
+\begin{quote}
+\textbf{Exportintegrität}
+
+PLY und STL konnten erfolgreich als TriangleMesh wieder eingelesen werden. Die Dreiecksanzahl von 29.998 bleibt in beiden Exportformaten erhalten.
+\end{quote}
+
+\subsubsection{Qualitätssicherung, Grenzen und Risiken des Modellteils}
+\label{sec:qualitaetssicherung-grenzen-und-risiken-des-modellteils}
+
+\paragraph{Warum die \texorpdfstring{Mesh $\rightarrow$ Punktwolke}{Mesh zu Punktwolke}-Richtung wichtig ist}
+\label{sec:warum-die-mesh-punktwolke-richtung-wichtig-ist}
+
+Der Poisson-Test zeigt, dass eine kleine Punktwolke $\rightarrow$ Mesh-Distanz allein nicht genügt. Eine Oberfläche kann die Messpunkte gut abdecken und gleichzeitig große zusätzliche Flächen enthalten. Erst die Gegenrichtung Mesh $\rightarrow$ Punktwolke macht diese nicht gestützten Bereiche deutlich. Deshalb wird die finale Auswahl nicht anhand einer einzelnen Metrik getroffen.
+
+\paragraph{Topologische Einschränkungen}
+\label{sec:topologische-einschraenkungen}
+
+\begin{itemize}
+\item Das finale Modell ist aufgrund vieler offener Boundary Edges nicht watertight.
+\item Es ist edge-manifold, wenn offene Ränder zugelassen werden, besitzt aber weiterhin Non-Manifold-Vertex-Konfigurationen.
+\item Die Oberfläche ist in Open3D nicht global orientierbar.
+\item Aggressive Reparatur wurde bewusst vermieden, nachdem Vertex Splitting neue Self-Intersections erzeugte.
+\item Für Anwendungen, die zwingend ein geschlossenes, orientierbares und vollständig manifoldes Volumenmodell benötigen, ist eine weitere spezialisierte Reparaturstufe erforderlich.
+\end{itemize}
+
+\paragraph{Grenzen der synthetischen Daten}
+\label{sec:grenzen-der-synthetischen-daten}
+
+Die aktuelle Punktwolke besteht aus synthetischen dentalähnlichen Teilflächen. Sie ist kein vollständiger intraoraler Scan mit Gingiva, realistischen Sichtbarkeitsgrenzen und scannerabhängigen Artefakten. Insbesondere die große Zahl offener Ränder und die Komponentenstruktur sind deshalb nur eingeschränkt auf reale Daten übertragbar. Vor einer praktischen Anwendung sollten Poisson/BPA-Auswahl, Radienfaktoren und Cleanup-Schwellen auf realen oder realistisch virtualisierten Scans erneut validiert werden.
+
+\paragraph{Datensatzspezifische Schwellenwerte}
+\label{sec:datensatzspezifische-schwellenwerte}
+
+Der Komponentenfilter von 250 Dreiecken wurde aus der konkreten Größenverteilung des A\_small-Testmeshes abgeleitet. Beim finalen 30k-Mesh wurde dagegen nur eine Schwelle von 10 Dreiecken verwendet, weil genau eine isolierte Ein-Dreieck-Komponente entfernt werden sollte. Diese Schwellenwerte sind bewusst nicht als feste allgemeine Dentalparameter zu verstehen.
+
+\subsubsection{Reproduzierbarkeit und Ausführung des Modellteils}
+\label{sec:reproduzierbarkeit-und-ausfuehrung-des-modellteils}
+
+Die wichtigsten Schritte können in der Poetry-Umgebung über folgende Module reproduziert werden:
+
+\begin{itemize}[leftmargin=*]
+\item Rekonstruktionsvergleich und BPA-Cleanup: \texttt{poetry run python -m }\longcode{registration3d.reconstruction.mesh\_main}
+\item BPA-Parameterstudie: \texttt{poetry run python -m }\longcode{registration3d.reconstruction.ball\_pivoting\_experiment}
+\item Komponentenanalyse: \texttt{poetry run python -m }\longcode{registration3d.reconstruction.component\_analysis}
+\item Topologieanalyse: \texttt{poetry run python -m }\longcode{registration3d.reconstruction.mesh\_topology\_analysis}
+\item Vereinfachungsstudie: \texttt{poetry run python -m }\longcode{registration3d.reconstruction.mesh\_simplification\_experiment}
+\item Finaler Export: \texttt{poetry run python -m }\longcode{registration3d.reconstruction.final\_mesh\_export}
+\end{itemize}
+
+\paragraph{Zentrale Ausgaben}
+\label{sec:zentrale-ausgaben}
+
+\begin{itemize}
+\item \path{output/mesh/poisson/filtered_mesh.ply} - gefilterte Poisson-Rekonstruktion
+\item \path{output/mesh/ball_pivoting/final_candidate_mesh.ply} - bereinigtes BPA-Ausgangsmesh
+\item \path{output/mesh/simplification_experiments/simplification_results.csv} - Vereinfachungsvergleich
+\item \path{output/mesh/final/dental_model_final.ply} - finales PLY-Modell
+\item \path{output/mesh/final/dental_model_final.stl} - finales STL-Modell
+\item \path{output/mesh/final/dental_model_full_resolution.ply} - Full-Resolution-Referenz
+\item \path{output/mesh/final/final_model_evaluation.json} - finale Qualitätsmetriken
+\item \path{output/mesh/final/final_model_summary.csv} - Vergleich Original vs. finales Modell
+\end{itemize}
+
+\subsubsection{Gesamtfazit}
+\label{sec:gesamtfazit}
+
+Das Projekt realisiert eine durchgängige Pipeline von mehreren räumlich getrennten dentalähnlichen Punktwolken bis zu einem exportierten 3-D-Dreiecksmodell. Im Registrierungsteil wurden fünf Verfahren experimentell verglichen. FPFH + Fast Global Registration + Point-to-Plane ICP wurde als Pairwise-Hauptverfahren ausgewählt und in einer Multiway-Registrierung mit vier Fragmenten erfolgreich eingesetzt. Die resultierende Gesamtpunktwolke umfasst 22.022 Punkte und bildet die Schnittstelle zum Modellteil.
+
+Für die Oberflächenrekonstruktion zeigte Ball Pivoting auf dem aktuellen Datensatz eine deutlich bessere geometrische Plausibilität als Poisson Surface Reconstruction. Nach Parameterstudie, Cleanup und Komponentenanalyse wurde ein zusammenhängendes BPA-Mesh mit 40.020 Dreiecken erzeugt. Topologische Einschränkungen wurden explizit untersucht; ein Reparaturversuch wurde verworfen, weil er neue Self-Intersections erzeugte. Diese Entscheidung erhält die geometrisch robustere Ausgangsoberfläche und macht die verbleibenden Grenzen transparent.
+
+Eine anschließende Quadric-Decimation auf rund 30.000 Dreiecke reduzierte die Modellkomplexität um 25,04 \%, während der symmetrische RMSE lediglich um 0,171 \% anstieg. Das finale Modell besitzt 16.649 Vertices, 29.998 Dreiecke und eine Connected Component. PLY- und STL-Export wurden durch erneutes Einlesen validiert. Damit sind sowohl Registrierung als auch 3-D-Modellkonstruktion als reproduzierbare Softwarepipeline implementiert und quantitativ dokumentiert.
+
+\begin{quote}
+\textbf{Gesamtergebnis}
+
+Punktwolken $\rightarrow$ FPFH/FGR/ICP-Registrierung $\rightarrow$ Pose-Graph-Multiway $\rightarrow$ combined\_cloud.ply $\rightarrow$ Ball Pivoting $\rightarrow$ Cleanup $\rightarrow$ Topologieanalyse $\rightarrow$ 30k-Vereinfachung $\rightarrow$ dental\_model\_final.ply / .stl.
+\end{quote}
+
+\subsection{Anhänge}
+\label{sec:marvin-anhaenge}
+
+\subsubsection{Zentrale Registrierungskonfiguration}
+\label{sec:zentrale-registrierungskonfiguration}
+
+\begin{verbatim}
+RegistrationConfig(
+    voxel_size=0.5,
+    normal_radius_factor=2.0,
+    max_nn=30,
+    correspondence_distance_factor=2.0,
+    max_iterations=100,
+    fpfh_radius_factor=5.0,
+    fpfh_max_nn=100,
+    ransac_distance_factor=1.5,
+    ransac_n=3,
+    ransac_max_iterations=100_000,
+    ransac_confidence=0.999,
+    fgr_distance_factor=0.5,
+    refinement_distance_factor=0.4,
+    evaluation_distance_factor=2.0,
+)
+\end{verbatim}
+
+Die Parameter werden zentral verwaltet, damit Experimente und Multiway-Pipeline dieselben Skalierungsannahmen verwenden können.
+
+\subsubsection{Zentrale Mesh-Konfiguration}
+\label{sec:zentrale-mesh-konfiguration}
+
+\begin{verbatim}
+MeshConfig(
+    normal_radius_factor=3.0,
+    normal_max_nn=50,
+    poisson_depth=9,
+    poisson_density_quantile=0.02,
+    ball_pivoting_radius_factors=(1.0, 1.5, 2.0),
+    minimum_component_triangles=250,
+    target_triangle_count=30_000,
+    evaluation_sample_points=100_000,
+)
+\end{verbatim}
+
+Die finale Exportpipeline verwendet für den letzten Component-Cleanup bewusst einen kleineren Schwellenwert von 10 Dreiecken, da in der 30k-Variante nur eine isolierte Ein-Dreieck-Komponente entfernt wird.
