@@ -43,7 +43,8 @@ After the direct acquisition approach through the Matrix Vision interfaces faile
 
 The main objective of this phase was to identify the software components responsible for communicating with and controlling the Omnicam and to determine whether the scanner's acquisition process could be reproduced or controlled outside the original CEREC environment. Particular attention was given to the possibility that the CEREC software performed additional operations that were not exposed through the standard Matrix Vision acquisition SDK.
 
-The investigation began by examining the components used by CEREC SW 5.1 during scanner operation. Process Monitor was used to observe the activity of the software while interacting with the scanner. This provided information about the processes, dynamic-link libraries, files, and other system resources involved during the acquisition workflow. The collected information was used to identify potentially relevant components for further analysis. The identified binaries were subsequently investigated using Ghidra. The purpose of the reverse-engineering process was not to fully reconstruct the entire CEREC software, but to identify relevant functions, classes, data structures, and relationships that could provide information about the scanner's acquisition pipeline. Particular attention was given to the following DLLs:
+The investigation began by examining the components used by CEREC SW 5.1 during scanner operation. Process Monitor was used to observe the activity of the software while interacting with the scanner. This provided information about the processes, dynamic-link libraries, files, and other system resources involved during the acquisition workflow. The collected information was used to identify potentially relevant components for further analysis. The identified binaries were subsequently investigated using Ghidra. An example of the reverse-engineering environment used during this analysis is provided in Appendix~\ref{app:ghidra}.
+The purpose of the reverse-engineering process was not to fully reconstruct the entire CEREC software, but to identify relevant functions, classes, data structures, and relationships that could provide information about the scanner's acquisition pipeline. Particular attention was given to the following DLLs:
 
 \begin{itemize}
     \item \code{acquire.dll}
@@ -273,6 +274,9 @@ Although the C++ receiver successfully captured and stored data transmitted by t
 As a result, the \code{frame.raw} output should be understood as a capture of received binary data rather than as a successfully reconstructed image.
 
 Combined with the lack of a reliable method for initiating the scan programmatically, the limited available documentation, and the difficulty of determining the internal data representation, this approach was ultimately considered impractical for obtaining image data from the Omnicam for the DentaVision pipeline. The scanner was therefore not used as the image source for the subsequent development. Instead, image acquisition was moved to the project's virtual/simulated pipeline, where the required camera input could be provided while allowing the remaining DentaVision processing and reconstruction pipeline to be developed independently of the limitations encountered with the physical scanner.
+
+Examples of the output produced by the C++ UDP/GVSP implementation during the data capture experiments are provided in Appendix~\ref{app:udp-output}. The four captures show representative outputs obtained during the communication and packet-analysis experiments.
+
 
 \subsection{Conclusion and Future Considerations}
 
@@ -1171,7 +1175,9 @@ The four selected scenes expose the reconstruction process to different levels
 of available local image structure. In particular, the \textit{Plastic} scene
 contains substantially fewer distinctive features than the other evaluated
 scenes and therefore provides a useful stress case for feature-based
-reconstruction.
+reconstruction. This characteristic makes the Middlebury scenes, and particularly
+\textit{Plastic}, a more relevant approximation of the low-texture conditions
+that may occur on dental surfaces than the initially used Palm Desert dataset.
 
 The purpose of this experiment was not to evaluate dense stereo reconstruction
 at this stage. Instead, the initial objective was to establish a baseline for
@@ -1713,3 +1719,5 @@ for the targeted stereo reconstruction scenario.
 This work investigated several approaches for reconstructing three-dimensional geometry from image data within the DentaVision project. Feature-based reconstruction using SIFT provided a functional sparse reconstruction pipeline and demonstrated that reliable camera motion and 3D points can be obtained when sufficient visual structure is available. However, the experiments on the low-texture Middlebury Plastic dataset revealed clear limitations of feature-based methods in regions with little distinctive texture. The use of OpenMVG and OpenMVS confirmed that a multi-view SfM pipeline does not fully overcome this limitation when the input images do not provide sufficient visual correspondences.
 Dense stereo methods proved more suitable for the low-texture scenario. StereoSGBM was able to produce a dense disparity map, but its accuracy remained limited, particularly in regions where local image structure was insufficient. In contrast, the IGEV-based stereo approach achieved substantially lower disparity errors on the same calibrated Middlebury stereo pair.
 The Plastic stereo pair is particularly relevant to the intended DentaVision application because its predominantly low-texture surfaces provide a scenario that is more representative of the visual characteristics expected from dental surfaces than the highly textured Palm Desert dataset. Based on its strong quantitative performance in this evaluation, IGEV will be used as the basis for the stereo matching component of the DentaVision reconstruction pipeline. Its ability to produce accurate dense disparity in this challenging low-texture scenario makes it a particularly suitable approach for the intended application.
+
+Although an integration with the other components of the DentaVision system could not be completed, the reconstruction stage was designed to provide a clean interface for the subsequent 3D registration stage. The rectified stereo image pair generated by the simulator, together with the relevant camera information, can be used by the selected stereo reconstruction method to generate a 3D point cloud in \code{.ply} format. This output is intended to serve as the input to the subsequent registration stage, allowing the reconstruction component to be integrated into the overall pipeline without requiring changes to its internal processing.
