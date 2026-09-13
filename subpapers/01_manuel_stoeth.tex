@@ -21,10 +21,12 @@ and integration into the whole program flow.
 An UR5e collaborative robot arm \cite{universalrobots_ur5e_datasheet} is modeled with six revolute joints, based on the afore mentioned repo\cite{ur5e_file_source}.
 The custom camera tool is mounted on the tool flange and
 consists of a scanner body plus left and right pinhole cameras with adjustable lateral offset, roll, field of view and near/far clipping. To reach the
-dense waypoint sweeps around the jaw, the IK solver is used in a modified fashion: after the damped least-squares IK, a short iterative refinement with
-the analytic Jacobian converges the end effector onto the desired tool-pose, and several collision-free seed configurations are tried when the first
-result is in collision. Movement between waypoints is planned with the \emph{pybullet-planning} library (RRT with smoothing, fixed seed for
-reproducibility) \cite{garrett2018pybulletplanning}.
+dense waypoint sweeps around the jaw, the inverse kinematics is used in a modified fashion. First, the damped least-squares solution (PyBullet
+\code{IK\_DLS}) is only a starting point: starting from a seeding joint configuration, the solver iterates up to ten times, computing the tool position
+and orientation error and applying a damped Jacobian update (analytic Jacobian) until the tool pose converges onto the requested target (position
+tolerance \code{1e-6} m). Second, since a single IK result may collide with the jaw, the solver is retried with different joint-space seed
+configurations and the first collision-free solution is kept. Movement between waypoints is planned with the \emph{pybullet-planning} library
+\cite{garrett2018pybulletplanning} (RRT-Connect with smoothing and restarts, fixed random seed for reproducible paths).
 
 \subsubsection{Realistic rendering with Blender}\label{ms:blender}
 
@@ -101,7 +103,7 @@ Table~\ref{tab:ms-camera-config}.
         \toprule
         \textbf{Parameter}                           & \textbf{Meaning}                                                                    \\
         \midrule
-        \code{CAMERA_LATERAL_\newlineOFFSET}         & lateral offset of one camera from the scanner axis; \code{baseline\_m = 2 x offset} \\
+        \code{CAMERA_LATERAL_OFFSET}                 & lateral offset of one camera from the scanner axis; \code{baseline\_m = 2 x offset} \\
         \code{CAMERA_FOV_DEG}, \code{CAMERA_LENS_MM} & horizontal field of view / lens focal length                                        \\
         \code{CAMERA_NEAR_M}, \code{CAMERA_FAR_M}    & near/far clipping planes of the pinhole camera                                      \\
         \code{CAMERA_ROLL_DEG}                       & roll of the camera rig around the viewing axis                                      \\
