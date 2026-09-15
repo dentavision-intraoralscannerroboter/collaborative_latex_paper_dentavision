@@ -12,7 +12,7 @@ Instead of treating the Omnicam as a conventional USB camera, the investigation 
 
 After the initial USB-level investigation, the focus shifted towards identifying the camera hardware used by the Omnicam and determining whether it could be accessed independently of the CEREC software. The investigation revealed that the scanner contained an industrial camera from MATRIX VISION, identified as a SiCamCCT camera belonging to the mvBlueCOUGAR family. The device was identified with serial number 27323555 and exposed a GenICam interface. The camera used an ICX424 sensor and communicated through GigE Vision.
 
-The identification of the camera was significant because it provided a potential acquisition interface that could be investigated independently of the higher-level CEREC software. The Matrix Vision ecosystem includes tools and libraries for configuring and acquiring images from compatible devices. Therefore, the investigation focused on the mvIMPACT Acquire SDK and the associated wxPropView utility.
+The identification of the camera was significant because it provided a potential acquisition interface that could be investigated independently of the higher-level CEREC software. The Matrix Vision ecosystem includes tools and libraries for configuring and acquiring images from compatible devices. Therefore, the investigation focused on the mvIMPACT Acquire SDK and the associated wxPropView utility. The wxPropView interface used during this investigation is shown in the appendix for reference (see Figure~\ref{fig:propview}). 
 
 \subsubsection{Camera Detection and SDK Investigation}
 
