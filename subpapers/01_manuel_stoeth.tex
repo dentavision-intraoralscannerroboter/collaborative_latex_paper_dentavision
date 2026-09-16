@@ -204,8 +204,7 @@ Blender GUI instance, mirrors joint states and TCP position, forwards the render
 
 On the Blender side, \code{rig.py} builds the whole scene procedurally (URDF meshes, armature, scanner, cameras, light, jaw import with backface
 culling, Cycles settings), and \code{mirror.py} runs the socket server in Blender: it applies the received joint angles and TCP position, executes
-the requested left/right Cycles renders per waypoint and reports progress. Finally, \code{visualize_scan.py} implements an additional tooling to visualize the
-rendered image datasets with NumPy.
+the requested left/right Cycles renders per waypoint and reports progress.
 
 \subsubsection{Configuration}\label{ms:config}
 
@@ -213,7 +212,7 @@ All parameters are collected in \code{src/ur5e\_bullet/config.py} and sorted by 
 (paths, robot and kinematics, camera model, rendering, PyBullet GUI, visualization, jaw material, Blender, scan positions).
 The file is the sole editing place for the parameters, which are forwarded into the live PyBullet session and, through the standalone
 load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters together with their meaning and current values.
-\begin{table*}[!t]
+\begin{table*}[!p]
     \centering
     \footnotesize
     \setlength{\tabcolsep}{4pt}
@@ -403,7 +402,7 @@ The following points describe how the configuration entries can be used to influ
     \begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_front}
-    \caption{Scanner at the defined tcp\_pos and tcp\_ori\_deg of a start position}
+    \caption{Scanner at the tcp\_pos and tcp\_ori\_deg of a start position}
     \label{fig:ms-waypoint_example_front}
     \end{figure}
     \item \code{approach}: Optional list of intermediate poses. These are driven to before the position from the values above. The main reason was to be able to set a default point from which the tcp\_pos is always reachable in order to prevent weird IK solutions based on the position of the robot before driving to the start position.
