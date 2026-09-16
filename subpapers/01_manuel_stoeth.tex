@@ -199,12 +199,13 @@ parameters in pixels, while \code{demo.py} writes them as \code{<n>_pose.json} t
 The interactive control loop also lives in \code{demo.py}: a console parses the commands defined in \code{commands.py},
 \code{viz.py} draws waypoint markers, look targets and cross-hairs in the PyBullet viewport, and
 \code{preview_and_move} plans a collision-free path and shows it before execution. \code{blender_link.py} is the TCP client that launches the
-Blender GUI instance, mirrors joint states and TCP position, forwards the render requests and waits for the completion messages
-. \code{decimate_stl.py} reduces the jaw STL to a voxel-decimated collision mesh for PyBullet.
+Blender GUI instance, mirrors joint states and TCP position, forwards the render requests and waits for the completion messages.
+\code{Decimate_stl.py} reduces the jaw STL to a voxel-decimated collision mesh for PyBullet.
 
 On the Blender side, \code{rig.py} builds the whole scene procedurally (URDF meshes, armature, scanner, cameras, light, jaw import with backface
 culling, Cycles settings), and \code{mirror.py} runs the socket server in Blender: it applies the received joint angles and TCP position, executes
-the requested left/right Cycles renders per waypoint and reports progress. Finally, \code{visualize_scan.py} implements an additional tooling to visualize
+the requested left/right Cycles renders per waypoint and reports progress. Finally, \code{visualize_scan.py} implements an additional tooling to visualize the
+rendered image datasets with numpy.
 
 \subsubsection{Configuration}\label{ms:config}
 
@@ -447,18 +448,11 @@ waypoint in order. At each waypoint the robot moves to the tool pose, the left/r
 reports completion before the sweep advances. Figure~\ref{fig:ms-scan-workflow} shows the workflow; Figure~\ref{fig:ms-dataflow} details the message
 and data flow for one waypoint together with the offline visualization step.
 
-\begin{figure}[H]
+\begin{figure}[!b]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/scan_workflow}
     \caption{Scan workflow for one start position. The sweep is driven by \code{demo.py}, executed by the PyBullet simulation and rendered by the Blender mirror.}
     \label{fig:ms-scan-workflow}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\columnwidth]{assets/manuel/dataflow}
-    \caption{Per-waypoint data flow and offline visualization of the exported camera poses.}
-    \label{fig:ms-dataflow}
 \end{figure}
 
 \subsubsection{Rendered dataset}\label{ms:results}
