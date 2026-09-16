@@ -221,35 +221,35 @@ This panel displays, under "Selected Tooth", a default tooth icon when no tooth 
 
 Below the Selected Tooth section is the Tooth Target area, which shows the target coordinates computed for the selected tooth: X, Y, Z for position, and pitch, yaw, roll for rotation. While no tooth is selected, all fields are shown as dashes rather than as zero values (Figure~\ref{fig:tooth_target_}); this is an intentional choice, since showing "0.0" in place of a missing value could be mistaken by the operator for an actual computed measurement, whereas a dash makes clear that no value has been computed yet. Once a tooth is selected, these fields update immediately to show the computed target values together with their unit (Figure~\ref{fig:tooth_target}). The values shown here were originally in millimeters, and were later changed to meters to match the units expected by the PyBullet robot simulation (Figure~\ref{fig:tooth_target_m}).
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/no_tooth_selected.png}
     \caption{No Tooth Selected Badge}
     \label{fig:no_tooth_selected_badge}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_selected.png}
     \caption{Tooth Selected View}
     \label{fig:tooth_selected_badge}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_target_.png}
     \caption{Tooth Target Landing/Default View}
     \label{fig:tooth_target_}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_target.png}
     \caption{Tooth Target View with 'mm' Unit}
     \label{fig:tooth_target}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.895\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_target_m.png}
     \caption{Tooth Target View with 'm' Unit}
@@ -264,13 +264,12 @@ The panel is built around a joystick, used to adjust position along X and Y by d
 
 As also shown in the state diagram (Figure~\ref{fig:state-diagram}), this panel is enabled while the system is in the \texttt{aligning} or \texttt{paused} states, and is locked during \texttt{scanning}, since a manual correction at that point could interfere with the ongoing scanning motion and put the patient's safety at risk.
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/joint_control.png}
     \caption{Joint Control Panel}
     \label{fig:joint_control}
 \end{figure}
-
 
 \subsection{Dental Chart Panel}
 
