@@ -15,6 +15,7 @@
 \usepackage{xparse}
 \usepackage{booktabs} % Required for \toprule, \midrule, \bottomrule in tables
 \usepackage{array,tabularx} % Full-width tables with wrapping columns
+\usepackage{xltabular} % Longtable + tabularx (page-breaking full-width tables)
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 \usepackage{placeins} % Provides \FloatBarrier to keep figures from moving too far
 
@@ -47,6 +48,9 @@
 \usepackage{graphicx}
 % \usepackage[colorlinks=true, allcolors=blue]{hyperref}
 \usepackage{booktabs}
+\usepackage{listings}
+\lstset{language=Python, basicstyle=\ttfamily, breaklines=true}
+
 
 
 \newcommand{\code}[1]{\texttt{\detokenize{#1}}}

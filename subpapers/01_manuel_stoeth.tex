@@ -212,12 +212,12 @@ All parameters are collected in \code{src/ur5e\_bullet/config.py} and sorted by 
 (paths, robot and kinematics, camera model, rendering, PyBullet GUI, visualization, jaw material, Blender, scan positions).
 The file is the sole editing place for the parameters, which are forwarded into the live PyBullet session and, through the standalone
 load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters together with their meaning and current values.
-\onecolumn
 \begin{table*}[!t]
     \centering
     \footnotesize
     \setlength{\tabcolsep}{4pt}
-    \caption{Configuration parameters in \code{config.py} (part 1 of 2).}
+    \caption{Configuration parameters in \code{config.py}.}
+    \label{tab:ms-config-entries}
     \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.29\textwidth}
                                  X
                                  >{\raggedright\arraybackslash}p{0.30\textwidth}@{}}
@@ -286,18 +286,20 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{LOOK_TARGET_COLOR} & look-target marker color (RGBA) & \code{[0.1, 1.0, 0.3, 0.95]} \\
         \bottomrule
     \end{tabularx}
-    \label{tab:ms-config-entries-1}
 \end{table*}
+
 \begin{table*}[!t]
     \centering
     \footnotesize
     \setlength{\tabcolsep}{4pt}
     \ContinuedFloat
-    \caption{Configuration parameters in \code{config.py} (part 2 of 2, continued).}
+    \caption{Configuration parameters in \code{config.py} (continued).}
     \begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.29\textwidth}
                                  X
                                  >{\raggedright\arraybackslash}p{0.30\textwidth}@{}}
         \toprule
+        \textbf{Parameter} & \textbf{Meaning} & \textbf{Current value} \\
+        \midrule
         \multicolumn{3}{l}{\textit{Jaw / material}} \\
         \midrule
         \code{GEBISS_SCALE} & jaw mesh scale (mm to m) & \code{[0.001, 0.001, 0.001]} \\
@@ -305,7 +307,6 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{GEBISS_SPECULAR} & specular IOR level of the jaw material & \code{0.2} \\
         \code{GEBISS_SHADING} & blender jaw shading mode: \code{flat}/ \code{smooth}/ \code{auto_smooth} & \code{auto_smooth} \\
         \code{GEBISS_AUTO_SMOOTH_ANGLE_DEG} & auto-smooth angle threshold (deg) & \code{30} \\
-        \textbf{Parameter} & \textbf{Meaning} & \textbf{Current value} \\
         \midrule
         \multicolumn{3}{l}{\textit{Blender}} \\
         \midrule
@@ -323,15 +324,11 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{START_POSITIONS} & start poses, approach sequences and parabola waypoint generators; described in the usage section (Section~\ref{ms:start-positions}) & --- \\
         \bottomrule
     \end{tabularx}
-    \label{tab:ms-config-entries-2}
 \end{table*}
-\twocolumn
-The \code{config.py} file is the only place to edit parameters; the values are forwarded into the live PyBullet session and, through the standalone
-load, into Blender.
 
 \subsection{Usage}\label{ms:usage}
 
-\subsubsection{Getting started}\label{ms:getting-started}
+\subsubsection{Getting started/Basic Commands}\label{ms:getting-started}
 
 The project is available under the dentavision GitHub organisation \cite{ur5e_bullet_repository}. It requires Python~$\geq$~3.14, Poetry~$\geq$~2.x and
 a GUI-capable Blender build available as \code{blender} on the \code{PATH}. The Poetry-managed simulation dependencies
@@ -341,51 +338,107 @@ On boot the arm moves to the \code{BOOT_START} pose without a jaw model loaded. 
 
 \begin{itemize}[leftmargin=*]
     \item \code{m x y z [rx ry rz]} moves the TCP via RRT (asks for confirmation; orientation defaults to \code{0 0 0}). The position values should not exceed 1m in any direction due to the operational range of the robot arm (will throw error) and the x value should be kept out of the negative range as the IK solutions tend to become somewhat unpredictable in the area behind the robot. Accepted inputs for the command would be for example \code{m 0.85 0 0.4} or \code{m 0.6 0.3 -0.4 180 90 0}.
-    \item \code{o x y z} sets the tool offset. This is only useful for testing the offset value of new robot attachments instead of the current scanner model, as the correct offset of the current scanner is loaded from config.py
-    \item \code{s <speed>} sets the global move speed (default \code{0.5}). This influences the speed with which the robot arm drives aloong the rrt path of a movement
+    \item \code{o x y z} sets the tool offset. This is only useful for testing the offset value of new robot attachments instead of the current scanner model, as the correct offset of the current scanner is loaded from config.py.
+    \item \code{s <speed>} sets the global move speed (default \code{0.5}). This influences the speed with which the robot arm drives aloong the rrt path of a movement.
     \item \code{@} resets the robot to the last joint configuration. This is needed, because the Pybullet GUI cant be configured to not let the mouse cursor interact with scene objects. So if clicking on the robot throws it off its position this is for resetting that.
     \item \code{jaw <nr> [upper|lower]} loads the jaw mesh from \code{data/meshes_jaws/<nr>} into PyBullet and Blender. This can only be done, when a jaw has already been loaded by a start position.
     \item \code{q} quits the interactive loop and closes the simulation including blender.
+    \item \code{start <name>} drives the robot to the start position <name> if defined in START\_POSITIONS in config.py.
 \end{itemize}
 
 \subsubsection{Defining start positions}\label{ms:start-positions}
 
 A start position bundles a target TCP pose, the jaw placement, orientation anchors, the camera view and further parameters for a waypoint generator. The entire goal of this composition is to define a function, that creates waypoints along a parabel, which are suited to the specific side of the jaw that has to be scanned from them. The config.py in the repository\cite{ur5e_bullet_repository} already containes start positions for the first jaw, meaning waypoint parabel configurations for the outer inner and upper side of its upper and lower jaw half. The following points describe how the configuration entries can be used to influence the waypoint generation:
-
+\begin{lstlisting}[caption={start position example}, label={lst:ms-start_pos_example}, language=Python]
+{
+  "a1l": {
+    "tcp_pos":  [0.616, 0, 0.296],
+    "tcp_ori_deg": [180, 90, 0],
+    "approach": [
+      {"tcp_pos": [0.85, 0, 0.38],
+      "tcp_ori_deg": [0, 0, 0],
+      "label": "1",
+      "use_current_seed": False},
+      {"tcp_pos": [0.616, 0, 0.296],
+      "tcp_ori_deg": [0, 90, 0],
+      "label": "2",
+      "use_current_seed": True}],
+    "jaw_pos":  [0.65, 0, 0.3],
+    "jaw_euler_deg": [0, 0, 90],
+    "jaw_folder": 1,
+    "jaw_type":  "lower",
+    "generator":parabola_waypoints,
+    "look_at_jaw": True,
+    "look_target": [0.662, 0.0],
+    "parabola":
+      {"x0": 0.616,
+      "a": 0.047,
+      "z": 0.296,
+      "n": 21,
+      "y_max": 0.037,
+      "power": 4},
+    "ori_anchors":
+      {"start": [90, 0, 0],
+      "mid": [180, 90, 0],
+      "end": [-90, 0, 0]},
+    "view":
+      {"apply": True,
+      "distance": 0.1,
+      "yaw": 90.0,
+      "pitch": -89.0,
+      "target": [0.65, 0.0, 0.3]},
+  }
+}
+\end{lstlisting}
 \begin{itemize}[leftmargin=*]
-    \item \code{tcp_pos} and \code{tcp_ori_deg}: These two values define the position and orientation the robot drives to before the jaw gets loaded. it should be equivalent to the origin of the start positions corresponding parabel
+    \item \code{tcp_pos} and \code{tcp_ori_deg}: These two values define the position and orientation the robot drives to before the jaw gets loaded. it should be equivalent to the origin of the start positions corresponding parabel\ref{fig:ms-waypoint_example_front}
     \begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_front}
     \caption{Scanner at the defined tcp\_pos and tcp\_ori\_deg of a start position}
     \label{fig:ms-waypoint_example_front}
     \end{figure}
-    \item \code{approach}: optional list of intermediate poses, each with its own IK seed, driven before the final pose.
-    \item \code{jaw\_pos} / \code{jaw\_euler\_deg}: placement of the jaw mesh in the PyBullet scene and Blender.
-    \item \code{jaw\_folder} / \code{jaw\_type}: jaw mesh directory under \code{data/meshes\_jaws/} and side (\code{upper} / \code{lower}).
-    \item \code{generator}: callable that computes the waypoints from this config (e.g.\ \code{parabola\_waypoints}); \code{waypoints} is a static
+    \item \code{approach}: Optional list of intermediate poses. These are driven to before the position from the values above. The main reason was to be able to set a default point from which the tcp\_pos is always reachable in order to prevent weird IK solutions based on the position of the robot before driving to the start position.
+    \item \code{jaw_pos} / \code{jaw_euler_deg}: Placement of the jaw mesh in the PyBullet scene and Blender.
+    \item \code{jaw_folder} / \code{jaw_type}: Jaw mesh directory under \code{data/meshes_jaws/} and side (\code{upper} / \code{lower}).
+    \item \code{generator}: Callable that computes the waypoints from this config (e.g.\ \code{parabola_waypoints}); \code{waypoints} is a static
     list fallback when no generator is set.
-    \item \code{parabola}: generator parameters (\code{x0}, \code{a}, \code{z}, \code{n}, \code{y\_max}, \code{power}).
-    \item \code{ori\_anchors}: orientation anchors (\code{start}, \code{mid}, \code{end}) in degrees, interpolated by the generator.
-    \item \code{look\_at\_jaw}: aims the camera view axis at the jaw model (or the optional \code{look\_target} \code{[x, y]}) projected to plane height.
-    \item \code{view}: PyBullet GUI camera for this position; \code{apply: true} applies \code{distance}, \code{yaw}, \code{pitch} and
-    \code{target}; \code{apply: false} (or absent) leaves the camera untouched.
+    \item \code{parabola.x0}: This is the world x position of the origin of the parabel. Should equal to the x value of \code{tcp_pos}.
+    \item \code{parabola.a}: This is the multiplicator of the parabel. With this its possible to stretch the height of the parabel along the world x axis.
+    \item \code{parabola.z}: Corresponds to the height at which the parabel lies flat down. Should equal the z value of \code{tcp_pos}.
+    \item \code{parabola.n}: Configures the amount of waypoints that are generated along the parabel. The number should be odd so the center waypoint lands on the \code{tcp_pos}.
+    \item \code{parabola.y_max}: This configures the span between the two outermost waypoints or in other words the range between the two ends of the parabel.
+    \item \code{parabola.power}: With this its possible to chose the power of the parabel. Mostly only 2 and for are needed here.
+    \item \code{ori_anchors}: The point of the orientation anchors is to define 3 orientations at the origin and at each end of the parabel. the orientation of the robot at the paypoints between these anchors is interpolated with these values. The images here show the start\ref{fig:ms-waypoint_example_left} mid\ref{fig:ms-waypoint_example_front} and end\ref{fig:ms-waypoint_example_right} orientation anchor position.
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_left}
+    \caption{Scanner at W\_min with the orientation of the start anchor}
+    \label{fig:ms-waypoint_example_left}
+    \end{figure}
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_right}
+    \caption{Scanner at W\_max with the orientation of the end anchor}
+    \label{fig:ms-waypoint_example_right}
+    \end{figure}
+    \item \code{look_at_jaw}: This is an additional toggle that changes the orientation generation additionally to the interpolation of the orientation anchors. It changes the orientation slightly, so the view direction looks exactly at the point defined in \code{look_target}, which ensures that the gradient of the view direction lies on the same level as the parabel. This helps to create a more direct vieweing angle on the tooth surface, but is only useful for the scan of the outer side o a jaw.
+    \item \code{view}: Here the Pybullet GUI camera viewpoint can be customized for a start position, so the user doesn't have to manually drag the camera there.
+    \item \code{view.apply}: This is a toggle, with which the camera position change can be turned on or off.
+    \item \code{view.distance}: This defines the distance of the camera from the target position.
+    \item \code{view.yaw/pitch}: Yaw and pitch of the camera. Pitch can't be 90° because a pybullet bug lets the whole scenery disapper, when it has that value.
+    \item \code{view.target}: the x y z position onto which the camera looks and revolves around.
 \end{itemize}
 
 The default configuration ships six positions for the three lower (\code{a1l}, \code{o1l}, \code{i1l}) and three upper arches (\code{a1u},
 \code{o1u}, \code{i1u}).
+\subsubsection{Start Position Commands}\label{ms:start-pos_commands}
 
-\subsubsection{Scan workflow}\label{ms:scan-workflow}
-
-Once a start position is active, \code{+ [n]} \code{- [n]} steps \code{n} waypoints forward or backward along the sweep. The scan commands are:
-
+Once a start position is active, the following additional commands can be used:
 \begin{itemize}[leftmargin=*]
-    \item \code{start <name>} moves the arm to a start position and loads the jaw model (available: \code{a1l}, \code{o1l}, \code{i1l},
-    \code{a1u}, \code{o1u}, \code{i1u}).
-    \item \code{scan [n]} drives all (or the first \code{n}) waypoints, saves the camera poses and renders the left/right images at each one.
-    \item \code{scan-all <start1> [start2 ...]} runs \code{start} and a full \code{scan} for each given start position in sequence (unreachable
-    positions are skipped, a render failure aborts the batch).
-    \item \code{visualize-scan <scan\_dir|render/> [--out \ldots] [--ray-len m]} runs the offline pose check (Section~\ref{ms:visualization}).
+    \item \code{+/-}: Can be used either only as \code{+/-} to let the robot drive to the next upper/lower waypoint or as \code{+/- <n>}, which drives the robot <n> waypoints in the chosen direction.
+    \item \code{scan <n>}: This allows to render a specific amount <n> of waypoints, which was mostly used to test the metadata generation of the scan process.
+    \item \code{scan-all <start1> [start2 ...]}: This command allows to render multiple start positions sequentially, which makes it possible to automate the hour long rendering process of multiple start positions.
 \end{itemize}
 
 Starting from a user-selected start position with its jaw model loaded (STL geometry placed both in PyBullet and Blender), the scan sweep visits every
