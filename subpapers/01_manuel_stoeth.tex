@@ -19,7 +19,7 @@ reconstruction pipeline can be used without scaling.
 \end{figure}
 \subsubsection{Robot model and camera tool}\label{ms:ik}
 The modeled UR5e collaborative robot arm \cite{universalrobots_ur5e_datasheet} consists of six revolute joints, based on the afore mentioned repo\cite{ur5e_file_source}.
-The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplysirona_cerec_ac_omnicam} scanner is mounted onto wrist\_3 of the robot.
+The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplysirona_cerec_ac_omnicam} scanner is mounted onto wrist\_3 of the robot. The arm parts are colored based on a gradient from green to red, which shows how far they are away from their joint limits.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/omnicam/scanner_vs_stl}
@@ -32,6 +32,8 @@ The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplys
     \caption{Description of the complete UR5e model}
     \label{fig:ms-complete_ur5e_in_pybullet}
 \end{figure}
+
+
 The preexisting IK solver has been modified in a few ways. One of that was changing the joint limits in order to allow or disallow certain IK solutions. The elbow\_joint lower limit for example
 was set to 0° to prevent ik solutions, where the forearm would bend upwards, while the wrist\_3\_joint limits were increased from 180° to the full hardware possible amount of 360° in both directions, to allow IK solutions for positions that previously resulted in unrecoverable positions. Additionally It is possible to set the seed for the IK solver to either a global seed for deterministic positioning or to the current position in order to achieve a solution close to the current one.
 \begin{table}[!htbp]
@@ -167,7 +169,7 @@ $\approx$ 2.7 h for the recorded scan above), a recorded folder is fully self-de
 The \code{visualize_scan.py} tool reads the recorded pose files to redraw all camera poses in the jaw frame; this was used to verify that the stereo
 baseline remains constant across the rendering process and that the cameras follow the intended path.
 
-\subsection{Code Structure and Workflows}\label{ms:structure}
+\subsection{Package/Code Structure}\label{ms:structure}
 
 \subsubsection{Component architecture}\label{ms:architecture}
 
@@ -204,13 +206,13 @@ On the Blender side, \code{rig.py} builds the whole scene procedurally (URDF mes
 culling, Cycles settings), and \code{mirror.py} runs the socket server in Blender: it applies the received joint angles and TCP position, executes
 the requested left/right Cycles renders per waypoint and reports progress. Finally, \code{visualize_scan.py} implements an additional tooling to visualize
 
-
 \subsubsection{Configuration}\label{ms:config}
 
 All parameters are collected in \code{src/ur5e\_bullet/config.py} and sorted by domain
 (paths, robot and kinematics, camera model, rendering, PyBullet GUI, visualization, jaw material, Blender, scan positions).
 The file is the sole editing place for the parameters, which are forwarded into the live PyBullet session and, through the standalone
 load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters together with their meaning and current values.
+\onecolumn
 \begin{table*}[!t]
     \centering
     \footnotesize
@@ -240,7 +242,7 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{GEBISS_COLL_CELL} & voxel cell size for collision mesh decimation (mm) & \code{1.5} \\
         \code{IK_LAMBDA} & damping factor of the IK solver & \code{0.05} \\
         \code{IK_TOLERANCE} & IK position tolerance (m) & \code{0.08} \\
-        \code{RRT_RESTARTS} & RRT planning restarts & \code{30} \\
+        \code{RRT_RESTARTS} & RRT planning re: target TCP position and orientation in degrees.starts & \code{30} \\
         \code{RRT_SMOOTH} & RRT path smoothing steps & \code{30} \\
         \code{RRT_SEED} & deterministic planning seed & \code{0} \\
         \code{JOINTS} & per-joint limits and rest poses, see Table~\ref{tab:ms-joint-limits} & --- \\
@@ -284,9 +286,8 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{LOOK_TARGET_COLOR} & look-target marker color (RGBA) & \code{[0.1, 1.0, 0.3, 0.95]} \\
         \bottomrule
     \end{tabularx}
-    \label{tab:ms-config-entries}
+    \label{tab:ms-config-entries-1}
 \end{table*}
-\newpage
 \begin{table*}[!t]
     \centering
     \footnotesize
@@ -319,15 +320,73 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \midrule
         \multicolumn{3}{l}{\textit{Scan positions}} \\
         \midrule
-        \code{START_POSITIONS} & start poses, approach sequences and parabola waypoint generators; described in the usage section (Section~\ref{ms:usage}) & --- \\
+        \code{START_POSITIONS} & start poses, approach sequences and parabola waypoint generators; described in the usage section (Section~\ref{ms:start-positions}) & --- \\
         \bottomrule
     \end{tabularx}
+    \label{tab:ms-config-entries-2}
 \end{table*}
-
+\twocolumn
 The \code{config.py} file is the only place to edit parameters; the values are forwarded into the live PyBullet session and, through the standalone
 load, into Blender.
 
+\subsection{Usage}\label{ms:usage}
+
+\subsubsection{Getting started}\label{ms:getting-started}
+
+The project is available under the dentavision GitHub organisation \cite{ur5e_bullet_repository}. It requires Python~$\geq$~3.14, Poetry~$\geq$~2.x and
+a GUI-capable Blender build available as \code{blender} on the \code{PATH}. The Poetry-managed simulation dependencies
+(PyBullet, \code{pybullet-planning}, NumPy, matplotlib) are installed in the project directory with \code{poetry install}, which installs the dependencies from \code{pyproject.toml}.
+After that the program can be started with running either \code{poetry run ur5e} or \code{poetry run python -m ur5e_bullet} in the project root.
+On boot the arm moves to the \code{BOOT_START} pose without a jaw model loaded. The \code{>} prompt accepts the basic move and inspection commands:
+
+\begin{itemize}[leftmargin=*]
+    \item \code{m x y z [rx ry rz]} moves the TCP via RRT (asks for confirmation; orientation defaults to \code{0 0 0}). The position values should not exceed 1m in any direction due to the operational range of the robot arm (will throw error) and the x value should be kept out of the negative range as the IK solutions tend to become somewhat unpredictable in the area behind the robot. Accepted inputs for the command would be for example \code{m 0.85 0 0.4} or \code{m 0.6 0.3 -0.4 180 90 0}.
+    \item \code{o x y z} sets the tool offset. This is only useful for testing the offset value of new robot attachments instead of the current scanner model, as the correct offset of the current scanner is loaded from config.py
+    \item \code{s <speed>} sets the global move speed (default \code{0.5}). This influences the speed with which the robot arm drives aloong the rrt path of a movement
+    \item \code{@} resets the robot to the last joint configuration. This is needed, because the Pybullet GUI cant be configured to not let the mouse cursor interact with scene objects. So if clicking on the robot throws it off its position this is for resetting that.
+    \item \code{jaw <nr> [upper|lower]} loads the jaw mesh from \code{data/meshes_jaws/<nr>} into PyBullet and Blender. This can only be done, when a jaw has already been loaded by a start position.
+    \item \code{q} quits the interactive loop and closes the simulation including blender.
+\end{itemize}
+
+\subsubsection{Defining start positions}\label{ms:start-positions}
+
+A start position bundles a target TCP pose, the jaw placement, orientation anchors, the camera view and further parameters for a waypoint generator. The entire goal of this composition is to define a function, that creates waypoints along a parabel, which are suited to the specific side of the jaw that has to be scanned from them. The config.py in the repository\cite{ur5e_bullet_repository} already containes start positions for the first jaw, meaning waypoint parabel configurations for the outer inner and upper side of its upper and lower jaw half. The following points describe how the configuration entries can be used to influence the waypoint generation:
+
+\begin{itemize}[leftmargin=*]
+    \item \code{tcp_pos} and \code{tcp_ori_deg}: These two values define the position and orientation the robot drives to before the jaw gets loaded. it should be equivalent to the origin of the start positions corresponding parabel
+    \begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_front}
+    \caption{Scanner at the defined tcp\_pos and tcp\_ori\_deg of a start position}
+    \label{fig:ms-waypoint_example_front}
+    \end{figure}
+    \item \code{approach}: optional list of intermediate poses, each with its own IK seed, driven before the final pose.
+    \item \code{jaw\_pos} / \code{jaw\_euler\_deg}: placement of the jaw mesh in the PyBullet scene and Blender.
+    \item \code{jaw\_folder} / \code{jaw\_type}: jaw mesh directory under \code{data/meshes\_jaws/} and side (\code{upper} / \code{lower}).
+    \item \code{generator}: callable that computes the waypoints from this config (e.g.\ \code{parabola\_waypoints}); \code{waypoints} is a static
+    list fallback when no generator is set.
+    \item \code{parabola}: generator parameters (\code{x0}, \code{a}, \code{z}, \code{n}, \code{y\_max}, \code{power}).
+    \item \code{ori\_anchors}: orientation anchors (\code{start}, \code{mid}, \code{end}) in degrees, interpolated by the generator.
+    \item \code{look\_at\_jaw}: aims the camera view axis at the jaw model (or the optional \code{look\_target} \code{[x, y]}) projected to plane height.
+    \item \code{view}: PyBullet GUI camera for this position; \code{apply: true} applies \code{distance}, \code{yaw}, \code{pitch} and
+    \code{target}; \code{apply: false} (or absent) leaves the camera untouched.
+\end{itemize}
+
+The default configuration ships six positions for the three lower (\code{a1l}, \code{o1l}, \code{i1l}) and three upper arches (\code{a1u},
+\code{o1u}, \code{i1u}).
+
 \subsubsection{Scan workflow}\label{ms:scan-workflow}
+
+Once a start position is active, \code{+ [n]} \code{- [n]} steps \code{n} waypoints forward or backward along the sweep. The scan commands are:
+
+\begin{itemize}[leftmargin=*]
+    \item \code{start <name>} moves the arm to a start position and loads the jaw model (available: \code{a1l}, \code{o1l}, \code{i1l},
+    \code{a1u}, \code{o1u}, \code{i1u}).
+    \item \code{scan [n]} drives all (or the first \code{n}) waypoints, saves the camera poses and renders the left/right images at each one.
+    \item \code{scan-all <start1> [start2 ...]} runs \code{start} and a full \code{scan} for each given start position in sequence (unreachable
+    positions are skipped, a render failure aborts the batch).
+    \item \code{visualize-scan <scan\_dir|render/> [--out \ldots] [--ray-len m]} runs the offline pose check (Section~\ref{ms:visualization}).
+\end{itemize}
 
 Starting from a user-selected start position with its jaw model loaded (STL geometry placed both in PyBullet and Blender), the scan sweep visits every
 waypoint in order. At each waypoint the robot moves to the tool pose, the left/right camera poses are computed in the jaw frame and written to
@@ -348,20 +407,6 @@ and data flow for one waypoint together with the offline visualization step.
     \caption{Per-waypoint data flow and offline visualization of the exported camera poses.}
     \label{fig:ms-dataflow}
 \end{figure}
-
-\subsection{Usage}\label{ms:usage}
-
-\subsubsection{Commands}\label{ms:commands}
-
-The environment is started inside the project directory with the Poetry-managed dependencies:
-
-\begin{itemize}[leftmargin=*]
-    \item \code{poetry run ur5e} starts the PyBullet GUI, the Blender mirror and the interactive control loop.
-    \item \code{start <name>} moves the arm to a start position and loads the jaw model (available: \code{a1l}, \code{a2l}, \code{aussen2}, \code{o1l}, \code{innen}).
-    \item \code{scan [n]} drives all (or the first \code{n}) waypoints, saves the camera poses and renders the left/right images at each one.
-    \item \code{scan-all <start1> [start2 ...]} runs \code{start} and a full \code{scan} for each given start position in sequence.
-    \item \code{visualize-scan <scan\_dir|render/> [--out \ldots] [--ray-len m]} runs the offline pose check (Section~\ref{ms:visualization}).
-\end{itemize}
 
 \subsubsection{Rendered dataset}\label{ms:results}
 
