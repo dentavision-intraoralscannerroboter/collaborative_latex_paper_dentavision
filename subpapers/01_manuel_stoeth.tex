@@ -4,7 +4,7 @@ To evaluate stereo-based 3D reconstruction algorithms, a large dataset of closel
 That is difficult to obtain in practice, since jaw scans involve complex geometries and limited access paths. This section presents a simulation
 environment that automatically generates such image datasets from pre-scanned dental arches of the Bits2Bites dataset \cite{bits2bites}, controlling
 the relative pose between adjacent images precisely.
-The environment combines an UR5e collaborative robot \cite{universalrobots_ur5e_datasheet} with a custom camera tool  in PyBullet \cite{coumans2016pybullet}, using a modified IK solver for
+The environment combines an UR5e collaborative robot \cite{universalrobots_ur5e_datasheet} with a custom camera tool in PyBullet \cite{coumans2016pybullet}, using a modified IK solver for
 arbitrary pose planning. High-quality images are rendered via a separate Blender instance that mirrors the simulation state, with customizable rendering settings \cite{blender_online_community}.
 \subsection{Design Decisions and Implementation}\label{ms:design}
 \subsubsection{Simulation with PyBullet}\label{ms:pybullet}
@@ -19,7 +19,7 @@ reconstruction pipeline can be used without scaling.
 \end{figure}
 \subsubsection{Robot model and camera tool}\label{ms:ik}
 The modeled UR5e collaborative robot arm \cite{universalrobots_ur5e_datasheet} consists of six revolute joints, based on the afore mentioned repo\cite{ur5e_file_source}.
-The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplysirona_cerec_ac_omnicam} scanner is mounted onto wrist\_3 of the robot. The arm parts are colored based on a gradient from green to red, which shows how far they are away from their joint limits.
+The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplysirona_cerec_ac_omnicam} scanner, is mounted onto wrist\_3 of the robot. The arm parts are colored based on a gradient from green to red, which shows how far they are away from their joint limits.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/omnicam/scanner_vs_stl}
@@ -35,7 +35,7 @@ The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplys
 
 
 The preexisting IK solver has been modified in a few ways. One of that was changing the joint limits in order to allow or disallow certain IK solutions. The elbow\_joint lower limit for example
-was set to 0° to prevent ik solutions, where the forearm would bend upwards, while the wrist\_3\_joint limits were increased from 180° to the full hardware possible amount of 360° in both directions, to allow IK solutions for positions that previously resulted in unrecoverable positions. Additionally It is possible to set the seed for the IK solver to either a global seed for deterministic positioning or to the current position in order to achieve a solution close to the current one.
+was set to 0° to prevent ik solutions, where the forearm would bend upwards, while the wrist\_3\_joint limits were increased from 180° to the full hardware possible amount of 360° in both directions, to allow IK solutions for positions that previously resulted in unrecoverable positions. Additionally it is possible to set the seed for the IK solver to either a global seed for deterministic positioning or to the current position in order to achieve a solution close to the current one.
 \begin{table}[!htbp]
     \centering
     \small
@@ -66,7 +66,7 @@ configurations and the first collision-free solution is kept. Movement between w
 
 Physics-based rendering with PyBullet's built-in renderer is not photo-realistic enough for validating stereo reconstruction algorithms. Blender
 \cite{blender_online_community} was chosen as the renderer because of prior experience with the software and its Cycles path tracer, which offers
-physically based materials and GPU acceleration. In practice this means, that a separate Blender instance builds the scene procedurally from the same URDF data and renders
+physically based materials and GPU acceleration. In practice this means that a separate Blender instance builds the scene procedurally from the same URDF data and renders
 left/right stereo pairs with the Cycles engine.
 \begin{figure}[!htbp]
     \centering
@@ -85,7 +85,7 @@ the GPU (NVIDIA RTX 3060) at 1920\,{$\times$}\,1080 (16:9); the Blender render p
 So that the rendered images correspond exactly to the simulated camera poses, the simulation mirrors its state to Blender over a TCP socket
 (\code{blender_link.py} on the simulator side, \code{mirror.py} in Blender, polled every 50\,ms). Each message carries the six joint angles and the
 tool-center-point position; Blender applies the joint angles to the armature bones and moves both cameras and the scanner light to the mirrored TCP
-position. A render request includes the target file paths for the left and right image, Blender renders both views sequentially and reports its
+position. A render request includes the target file paths for the left and right image. Blender renders both views sequentially and reports its
 completion. The jaw model is loaded in both applications from the same STL files with identical transforms (world scale
 \code{S} = 1 m per Blender unit). Its material is set to a roughness/specular pair of 0.8/0.2, and backface culling makes the mesh one-sided: the
 inside of the dental model becomes transparent, so the underside of the jaw never appears in the rendered images.
@@ -243,7 +243,7 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{GEBISS_COLL_CELL} & voxel cell size for collision mesh decimation (mm) & \code{1.5} \\
         \code{IK_LAMBDA} & damping factor of the IK solver & \code{0.05} \\
         \code{IK_TOLERANCE} & IK position tolerance (m) & \code{0.08} \\
-        \code{RRT_RESTARTS} & RRT planning re: target TCP position and orientation in degrees.starts & \code{30} \\
+        \code{RRT_RESTARTS} & RRT planning restarts & \code{30} \\
         \code{RRT_SMOOTH} & RRT path smoothing steps & \code{30} \\
         \code{RRT_SEED} & deterministic planning seed & \code{0} \\
         \code{JOINTS} & per-joint limits and rest poses, see Table~\ref{tab:ms-joint-limits} & --- \\
@@ -288,7 +288,7 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \bottomrule
     \end{tabularx}
 \end{table*}
-
+\newpage
 \begin{table*}[!t]
     \centering
     \footnotesize
@@ -326,22 +326,28 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \bottomrule
     \end{tabularx}
 \end{table*}
-
 \subsection{Usage}\label{ms:usage}
+
+\begin{figure}[!b]
+    \centering
+    \includegraphics[width=\columnwidth]{assets/manuel/console}
+    \caption{Console view after program start}
+    \label{fig:console}
+\end{figure}
 
 \subsubsection{Getting started/Basic Commands}\label{ms:getting-started}
 
 The project is available under the dentavision GitHub organisation \cite{ur5e_bullet_repository}. It requires Python~$\geq$~3.14, Poetry~$\geq$~2.x and
 a GUI-capable Blender build available as \code{blender} on the \code{PATH}. The Poetry-managed simulation dependencies
 (PyBullet, \code{pybullet-planning}, NumPy, matplotlib) are installed in the project directory with \code{poetry install}, which installs the dependencies from \code{pyproject.toml}.
-After that the program can be started with running either \code{poetry run ur5e} or \code{poetry run python -m ur5e_bullet} in the project root.
+After that the program can be started by running either \code{poetry run ur5e} or \code{poetry run python -m ur5e_bullet} in the project root.
 On boot the arm moves to the \code{BOOT_START} pose without a jaw model loaded. The \code{>} prompt accepts the basic move and inspection commands:
 
 \begin{itemize}[leftmargin=*]
-    \item \code{m x y z [rx ry rz]} moves the TCP via RRT (asks for confirmation; orientation defaults to \code{0 0 0}). The position values should not exceed 1m in any direction due to the operational range of the robot arm (will throw error) and the x value should be kept out of the negative range as the IK solutions tend to become somewhat unpredictable in the area behind the robot. Accepted inputs for the command would be for example \code{m 0.85 0 0.4} or \code{m 0.6 0.3 -0.4 180 90 0}.
+    \item \code{m x y z [rx ry rz]} moves the TCP via RRT (asks for confirmation; orientation defaults to \code{0 0 0}). The position values should not exceed 1m in any direction due to the operational range of the robot arm (will throw an error) and the x value should be kept out of the negative range as the IK solutions tend to become somewhat unpredictable in the area behind the robot. Accepted inputs for the command would be for example \code{m 0.85 0 0.4} or \code{m 0.6 0.3 -0.4 180 90 0}.
     \item \code{o x y z} sets the tool offset. This is only useful for testing the offset value of new robot attachments instead of the current scanner model, as the correct offset of the current scanner is loaded from config.py.
     \item \code{s <speed>} sets the global move speed (default \code{0.5}). This influences the speed with which the robot arm drives aloong the rrt path of a movement.
-    \item \code{@} resets the robot to the last joint configuration. This is needed, because the Pybullet GUI cant be configured to not let the mouse cursor interact with scene objects. So if clicking on the robot throws it off its position this is for resetting that.
+    \item \code{@} resets the robot to the last joint configuration. This is needed, because the Pybullet GUI cant be configured to not let the mouse cursor interact with scene objects. So if clicking on the robot throws it off its position, this is for resetting that.
     \item \code{jaw <nr> [upper|lower]} loads the jaw mesh from \code{data/meshes_jaws/<nr>} into PyBullet and Blender. This can only be done, when a jaw has already been loaded by a start position.
     \item \code{q} quits the interactive loop and closes the simulation including blender.
     \item \code{start <name>} drives the robot to the start position <name> if defined in START\_POSITIONS in config.py.
@@ -349,7 +355,7 @@ On boot the arm moves to the \code{BOOT_START} pose without a jaw model loaded. 
 
 \subsubsection{Defining start positions}\label{ms:start-positions}
 
-A start position bundles a target TCP pose, the jaw placement, orientation anchors, the camera view and further parameters for a waypoint generator. The entire goal of this composition is to define a function, that creates waypoints along a parabel, which are suited to the specific side of the jaw that has to be scanned from them. The config.py in the repository\cite{ur5e_bullet_repository} already containes start positions for the first jaw, meaning waypoint parabel configurations for the outer inner and upper side of its upper and lower jaw half. The following points describe how the configuration entries can be used to influence the waypoint generation:
+A start position bundles a target TCP pose, the jaw placement, orientation anchors, the camera view and further parameters for a waypoint generator. The entire goal of this composition is to define a function, that creates waypoints along a parabel, which are suited to the specific side of the jaw that has to be scanned from them. The config.py in the repository\cite{ur5e_bullet_repository} already contain start positions for the first jaw, meaning waypoint parabel configurations for the outer inner and upper side of its upper and lower jaw halves.
 \begin{lstlisting}[caption={start position example}, label={lst:ms-start_pos_example}, language=Python]
 {
   "a1l": {
@@ -391,8 +397,10 @@ A start position bundles a target TCP pose, the jaw placement, orientation ancho
   }
 }
 \end{lstlisting}
+The following points describe how the configuration entries can be used to influence the waypoint generation:
+
 \begin{itemize}[leftmargin=*]
-    \item \code{tcp_pos} and \code{tcp_ori_deg}: These two values define the position and orientation the robot drives to before the jaw gets loaded. it should be equivalent to the origin of the start positions corresponding parabel\ref{fig:ms-waypoint_example_front}
+    \item \code{tcp_pos} and \code{tcp_ori_deg}: These two values define the position and orientation the robot drives to before the jaw gets loaded. The position is supposed to be located at the origin of the parabel \ref{fig:ms-waypoint_example_front}
     \begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_front}
@@ -408,9 +416,9 @@ A start position bundles a target TCP pose, the jaw placement, orientation ancho
     \item \code{parabola.a}: This is the multiplicator of the parabel. With this its possible to stretch the height of the parabel along the world x axis.
     \item \code{parabola.z}: Corresponds to the height at which the parabel lies flat down. Should equal the z value of \code{tcp_pos}.
     \item \code{parabola.n}: Configures the amount of waypoints that are generated along the parabel. The number should be odd so the center waypoint lands on the \code{tcp_pos}.
-    \item \code{parabola.y_max}: This configures the span between the two outermost waypoints or in other words the range between the two ends of the parabel.
+    \item \code{parabola.y_max}: This configures the span between the two outermost waypoints, or in other words, the range between the two ends of the parabel.
     \item \code{parabola.power}: With this its possible to chose the power of the parabel. Mostly only 2 and for are needed here.
-    \item \code{ori_anchors}: The point of the orientation anchors is to define 3 orientations at the origin and at each end of the parabel. the orientation of the robot at the paypoints between these anchors is interpolated with these values. The images here show the start\ref{fig:ms-waypoint_example_left} mid\ref{fig:ms-waypoint_example_front} and end\ref{fig:ms-waypoint_example_right} orientation anchor position.
+    \item \code{ori_anchors}: The point of the orientation anchors is to define 3 orientations at the origin and at each end of the parabel. the orientation of the robot at the paypoints between these anchors is interpolated with these values. The images here show the start\ref{fig:ms-waypoint_example_left} mid\ref{fig:ms-waypoint_example_front} and end\ref{fig:ms-waypoint_example_right} orientation anchor positions.
     \begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_left}
@@ -438,50 +446,70 @@ The default configuration ships six positions for the three lower (\code{a1l}, \
 Once a start position is active, the following additional commands can be used:
 \begin{itemize}[leftmargin=*]
     \item \code{+/-}: Can be used either only as \code{+/-} to let the robot drive to the next upper/lower waypoint or as \code{+/- <n>}, which drives the robot <n> waypoints in the chosen direction.
-    \item \code{scan <n>}: This allows to render a specific amount <n> of waypoints, which was mostly used to test the metadata generation of the scan process.
+    \item \code{scan <n>}: This allows to render a specific number <n> of waypoints, which was mostly used to test the metadata generation of the scan process.
     \item \code{scan-all <start1> [start2 ...]}: This command allows to render multiple start positions sequentially, which makes it possible to automate the hour long rendering process of multiple start positions.
 \end{itemize}
 
-Starting from a user-selected start position with its jaw model loaded (STL geometry placed both in PyBullet and Blender), the scan sweep visits every
-waypoint in order. At each waypoint the robot moves to the tool pose, the left/right camera poses are computed in the jaw frame and written to
-\code{<n>\_pose.json}, and a render request for the left and right image is sent to Blender. Blender renders both views via Cycles on the GPU and
-reports completion before the sweep advances. Figure~\ref{fig:ms-scan-workflow} shows the workflow; Figure~\ref{fig:ms-dataflow} details the message
-and data flow for one waypoint together with the offline visualization step.
+The process of fully rendering a start position is visualized in Figure~\ref{fig:ms-scan-workflow}. First, a scan folder is created and the initial \code{render_settings.json} is written;
+the robot then drives to the first approach pose (RRT) and sequentially moves along the waypoints to W0 without rendering. For each further waypoint it repeats the same
+sequence: the robot moves to the next waypoint, the left/right camera poses are computed in the jaw frame and written to
+\code{<n>_pose.json}, and a render request for the left and right image is sent to Blender. Blender renders both views via Cycles on the GPU, stores
+the PNGs in the scan folder and reports completion. After the last waypoint \code{render_settings.json} is updated with the measured \code{render_duration_s}.
 
-\begin{figure}[!b]
+\begin{figure}[!t]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/scan_workflow}
-    \caption{Scan workflow for one start position. The sweep is driven by \code{demo.py}, executed by the PyBullet simulation and rendered by the Blender mirror.}
+    \caption{Scan workflow for one start position.}
     \label{fig:ms-scan-workflow}
 \end{figure}
 
-\subsubsection{Rendered dataset}\label{ms:results}
 
-An example run with start position \code{a1l} produces the folder
-\code{render/lower\_1\_a1l\_1920x1080\_lat1.7mm} containing 21 pose files
-(\code{0\_pose.json} through \code{20\_pose.json}), 42 rendered PNGs (left/right per waypoint) and \code{render\_settings.json}. The pose file for each
-waypoint stores \code{waypoint}, \code{label} and \code{camera\_left}/\code{camera\_right} with \code{position} and \code{quaternion} (x, y, z, w)
-in the jaw coordinate frame. \code{render\_settings.json} stores the scan context (\code{start\_position}, jaw folder/type, jaw pose, render
-resolution, engine/device, render duration) and the full reconstruction parameter block used by the stereo pipeline: \code{baseline\_m = 0.0034},
-\code{camera\_fov\_deg = 87}, \code{camera\_lens\_mm $\approx$ 18.97}, \code{camera\_far\_m = 0.04}, \code{rectified = true},
-\code{camera\_intrinsic} with \code{fx\_px = fy\_px = 1011.63}, \code{cx\_px = 960}, \code{cy\_px = 540} on a 36\,mm $\times$ 20.25\,mm sensor. The
+\subsubsection{Rendered datasets}\label{ms:results}
+
+All six start positions were rendered into complete scan datasets. Each scan produces a folder under \code{render/} whose name encodes the scan
+geometry (jaw type, jaw folder, start position, render resolution and stereo baseline), e.g.\ \code{lower_1_a1l_1920x1080_lat1.7mm}, containing
+21 pose files (\code{0_pose.json} through \code{20_pose.json}), 42 rendered PNGs (left/right per waypoint) and a single \code{render_settings.json}; the
+field and file layout is detailed in Section~\ref{ms:datasets}. Table~\ref{tab:ms-rendered-datasets} summarizes the six datasets together with their
+measured render durations.
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Rendered datasets for the six start positions.}
+    \label{tab:ms-rendered-datasets}
+    \begin{tabularx}{\columnwidth}{@{}lll>{\raggedright\arraybackslash}X@{}}
+        \toprule
+        \textbf{Start position} & \textbf{Jaw} & \textbf{Waypoints} & \textbf{Total render time} \\
+        \midrule
+        \code{a1l} & lower & 21 & 2.7\,h \\
+        \code{o1l} & lower & 21 & 2.3\,h \\
+        \code{i1l} & lower & 21 & 4.3\,h \\
+        \code{a1u} & upper & 21 & 2.8\,h \\
+        \code{o1u} & upper & 21 & 2.6\,h \\
+        \code{i1u} & upper & 21 & in progress \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+The reconstruction parameter block exported by each dataset feeds the stereo pipeline directly: \code{baseline_m =
+0.0034}, \code{camera_fov_deg = 87}, \code{camera_lens_mm $\approx$ 18.97}, \code{camera_far_m = 0.04}, \code{rectified = true},
+\code{camera_intrinsic} with \code{fx_px = fy_px = 1011.63}, \code{cx_px = 960}, \code{cy_px = 540} on a 36\,mm $\times$ 20.25\,mm sensor. The
 jaw meshes rendered by the simulation are real intra-oral scans from the Bits2Bites dataset \cite{bits2bites}, i.e.\ 200 registered pairs of upper
-and lower dental arches in STL format, acquired with Carestream and 3Shape TRIOS scanners. A second dataset with start position \code{o1l} is
-generated identically, which supports the stereo registration and model construction sections with synthetic image pairs whose relative camera poses
-are known precisely.
+and lower dental arches in STL format, acquired with Carestream and 3Shape TRIOS scanners. All datasets together cover both the lower and the upper
+arch from three view sides each, so that the stereo registration and model construction sections are supplied with synthetic image pairs whose
+relative camera poses are known precisely.
 
-\subsubsection{Visualization}\label{ms:visualization}
-
-The offline pose visualization (\code{visualize-scan}) draws all camera rays (length = \code{camera\_far\_m}) from the \code{pose.json} files in the
-jaw frame with \code{matplotlib}. As a \emph{positioning check} it shows the left (red) and right (blue) camera centers, the constant stereo baseline
-(measured $\lvert \mathbf{L}-\mathbf{R}\rvert$, which should equal \code{baseline\_m}), the sweep order and the jaw bounding box. As an entry point
-into the data work it provides the exact camera poses that feed the reconstruction pipeline, together with the ray geometry in orthographic
-projection.
+The exported \code{pose.json} files encode the camera poses purely as position and quaternion (x, y, z, w) in the jaw frame. As a reference
+implementation for how these poses are to be interpreted, \code{visualize-scan} reads the pose files and reconstructs the full camera geometry from
+them: it rotates the view vector $(0,0,-1)$ by each camera's quaternion to draw the camera rays (length \code{camera_far_m}) from the left (red)
+and right (blue) camera centers with \code{matplotlib}, verifies the stereo baseline by measuring $\lvert \mathbf{L}-\mathbf{R}\rvert$ (expected
+constant \code{baseline\_m}) and plots the sweep order and the jaw bounding box. Any consumer of the exported data can therefore use this tool as a
+reference for the pose convention before feeding the poses into the reconstruction pipeline.
 
 \subsubsection{Reconstruction reference}\label{ms:reconstruction}
 
 The exported stereo pairs with known intrinsics and extrinsics are the input to the subsequent image acquisition and 3D reconstruction section. The
 rectified left/right pairs enable standard stereo matching (e.g.\ SGM \cite{hirschmuller_stereo_2008} or learned methods such as IGEV-Stereo
-\cite{xu_iterative_2023}) followed by point triangulation with the stated baseline; the \code{camera\_far\_m} value bounds the penetration of the
+\cite{xu_iterative_2023}) followed by point triangulation with the stated baseline; the \code{camera_far_m} value bounds the penetration of the
 viewing rays into the jaw surface and can be used as a near-plane limit when triangulating intra-oral geometry. All pose files together realize the
 photo-granular pose ground-truth that is otherwise hard to obtain for real intra-oral scans.
