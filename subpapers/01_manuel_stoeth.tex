@@ -4,26 +4,26 @@ To evaluate stereo-based 3D reconstruction algorithms, a large dataset of closel
 That is difficult to obtain in practice, since jaw scans involve complex geometries and limited access paths. This section presents a simulation
 environment that automatically generates such image datasets from pre-scanned dental arches of the Bits2Bites dataset \cite{bits2bites}, controlling
 the relative pose between adjacent images precisely.
-The environment combines an UR5e collaborative robot \cite{universalrobots_ur5e_datasheet} with a custom camera tool in PyBullet \cite{coumans2016pybullet}, using a modified IK solver for
+The environment combines a UR5e collaborative robot \cite{universalrobots_ur5e_datasheet} with a custom camera tool in PyBullet \cite{coumans2016pybullet}, using a modified IK solver for
 arbitrary pose planning. High-quality images are rendered via a separate Blender instance that mirrors the simulation state, with customizable rendering settings \cite{blender_online_community}.
 \subsection{Design Decisions and Implementation}\label{ms:design}
 \subsubsection{Simulation with PyBullet}\label{ms:pybullet}
 PyBullet \cite{coumans2016pybullet} was chosen as the physics and robot kinematics backend. This decision was made after trying to use NVIDIA URSim, which proved to be too difficult to set up in
-linux due to specific driver dependencies, which weren't bundled in any easily accesible repository for fedora linux, and mujoco, which I set aside after finding a github repo\cite{ur5e_file_source} that provided a working UR5e model including mesh files and an URDF description file for the exact UR model we were targeting, which was implemeted with pybullet. It loads the UR5e robot from a URDF description, provides forward and inverse kinematics, collision detection and a GUI for inspection. All quantities are kept in SI units (metres) so that camera poses exported for the
+Linux due to specific driver dependencies, which weren't bundled in any easily accessible repository for Fedora Linux, and MuJoCo, which I set aside after finding a GitHub repository~\cite{ur5e_file_source} that provided a working UR5e model including mesh files and a URDF description file for the exact UR model we were targeting, which was implemented with PyBullet. It loads the UR5e robot from a URDF description, provides forward and inverse kinematics, collision detection and a GUI for inspection. All quantities are kept in SI units (metres) so that camera poses exported for the
 reconstruction pipeline can be used without scaling.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/pybullet/josepdaniel_pybullet}
-    \caption{Basic UR5e implementation sitting on a table in pybullet\cite{ur5e_file_source}}
+    \caption{Basic UR5e implementation sitting on a table in PyBullet~\cite{ur5e_file_source}.}
     \label{fig:ms-pybullet_bare}
 \end{figure}
 \subsubsection{Robot model and camera tool}\label{ms:ik}
-The modeled UR5e collaborative robot arm \cite{universalrobots_ur5e_datasheet} consists of six revolute joints, based on the afore mentioned repo\cite{ur5e_file_source}.
+The modeled UR5e collaborative robot arm \cite{universalrobots_ur5e_datasheet} consists of six revolute joints, based on the aforementioned repository~\cite{ur5e_file_source}.
 The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplysirona_cerec_ac_omnicam} scanner, is mounted onto wrist\_3 of the robot. The arm parts are colored based on a gradient from green to red, which shows how far they are away from their joint limits.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/omnicam/scanner_vs_stl}
-    \caption{The Sirona Omnicam scanner device and the stl model used in the urdf description}
+    \caption{The Sirona Omnicam scanner device and the STL model used in the URDF description}
     \label{fig:ms-omnicam_stl}
 \end{figure}
 \begin{figure}[!htbp]
@@ -34,8 +34,8 @@ The custom camera tool, which is modeled after the Sirona Omnicam\cite{dentsplys
 \end{figure}
 
 
-The preexisting IK solver has been modified in a few ways. One of that was changing the joint limits in order to allow or disallow certain IK solutions. The elbow\_joint lower limit for example
-was set to 0° to prevent ik solutions, where the forearm would bend upwards, while the wrist\_3\_joint limits were increased from 180° to the full hardware possible amount of 360° in both directions, to allow IK solutions for positions that previously resulted in unrecoverable positions. Additionally it is possible to set the seed for the IK solver to either a global seed for deterministic positioning or to the current position in order to achieve a solution close to the current one.
+The preexisting IK solver has been modified in a few ways. One such change was changing the joint limits in order to allow or disallow certain IK solutions. The elbow\_joint lower limit, for example,
+was set to 0° to prevent IK solutions, where the forearm would bend upwards, while the wrist\_3\_joint limits were increased from 180° to the full hardware possible amount of 360° in both directions, to allow IK solutions for positions that previously resulted in unrecoverable positions. Additionally, it is possible to set the seed for the IK solver to either a global seed for deterministic positioning or to the current position in order to achieve a solution close to the current one.
 \begin{table}[!htbp]
     \centering
     \small
@@ -71,14 +71,14 @@ left/right stereo pairs with the Cycles engine.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/blender/blender_example_together}
-    \caption{A position mirrored from pybullet to blender}
+    \caption{A position mirrored from PyBullet to Blender}
     \label{fig:ms-blender_example}
 \end{figure}
 The scene is set up entirely by script (\code{rig.py}): The URDF link meshes are imported, re-oriented and parented to a bone armature constructed
-from the joint data, and the scanner tool, both pinhole cameras and the scanner light are attached to the \code{wrist\_3} frame. Default Camera and light
+from the joint data, and the scanner tool, both pinhole cameras and the scanner light are attached to the \code{wrist\_3} frame. Default camera and light
 parameters consist of: a full-frame 16:9 sensor (36\,{$\times$}\,20.25\,mm), a horizontal field of view of
 87°, a stereo baseline of 1.7\,mm lateral offset, and near/far clipping at 1/40\,mm. The scanner light is a point light offset a few
-millimeters forward from the tcp, to prevent it from clipping in the scanner stl, ensuring the same lighting for both render pairs. Rendering runs with Cycles on
+millimeters forward from the TCP, to prevent it from clipping in the scanner STL, ensuring the same lighting for both render pairs. Rendering runs with Cycles on
 the GPU (NVIDIA RTX 3060) at 1920\,{$\times$}\,1080 (16:9); the Blender render properties use 4096 samples with denoising enabled at the high and
 \emph{Accurate} output quality.
 
@@ -108,7 +108,7 @@ contains the two rendered images (\code{iL_render.png} and \code{iR_render.png})
 
 Each \code{i_pose.json} stores the waypoint index and label together with the left and right camera pose as position (in metres) and quaternion
 (x, y, z, w) in the jaw frame. Because all quantities are kept in SI units, the reconstruction pipeline can consume these poses directly without any
-scaling. The metadata of the JSON files is summarized in Table~\ref{tab:ms-dataset-settings}; Together with the measured render times (e.g.\ 9731 s
+scaling. The metadata of the JSON files is summarized in Table~\ref{tab:ms-dataset-settings}. Together with the measured render times (e.g.\ 9731 s
 $\approx$ 2.7 h for the recorded scan above), a recorded folder is fully self-describing.
 
 \begin{table}[t]
@@ -125,7 +125,7 @@ $\approx$ 2.7 h for the recorded scan above), a recorded folder is fully self-de
         \code{jaw_folder}  & folder number in \textbf{data/meshes\_jaws/}\cite{ur5e_bullet_repository} \\
         \code{jaw_type} &  \code{upper}/\code{lower} jaw \\
         \code{jaw_pos}  & world frame position (m) \\
-        \code{jaw_euler_deg} & word frame orientation (deg) \\
+        \code{jaw_euler_deg} & world frame orientation (deg) \\
         \code{jaw_shading} & flat/smooth/auto-smooth shading of the jaw mesh \\
         \code{jaw_auto_smooth_angle_deg} & auto-smooth angle threshold (deg), null for flat \\
         \code{render_w} & image resolution width \\
@@ -140,7 +140,7 @@ $\approx$ 2.7 h for the recorded scan above), a recorded folder is fully self-de
         \midrule
         \code{camera_fov_deg} &  opening angle of the camera\\
         \code{camera_lens_mm} &  lens size based on render settings\\
-        \code{camera_lateral_offset}  & distance between camera and tcp \\
+        \code{camera_lateral_offset}  & distance between camera and TCP \\
         \code{baseline_m} & distance between both cameras\\
         \code{camera_far_m} & render far clipping plane (0.04 m) \\
         \code{rectified}  & currently always \code{true} \\
@@ -196,16 +196,16 @@ parameters in pixels, while \code{demo.py} writes them as \code{<n>_pose.json} t
     \label{fig:ms-architecture}
 \end{figure*}
 
-The interactive control loop also lives in \code{demo.py}: a console parses the commands defined in \code{commands.py},
+The interactive control loop also lives in \code{demo.py}: a console parses the commands defined in \code{commands.py};
 \code{viz.py} draws waypoint markers, look targets and cross-hairs in the PyBullet viewport, and
 \code{preview_and_move} plans a collision-free path and shows it before execution. \code{blender_link.py} is the TCP client that launches the
 Blender GUI instance, mirrors joint states and TCP position, forwards the render requests and waits for the completion messages.
-\code{Decimate_stl.py} reduces the jaw STL to a voxel-decimated collision mesh for PyBullet.
+\code{decimate_stl.py} reduces the jaw STL to a voxel-decimated collision mesh for PyBullet.
 
 On the Blender side, \code{rig.py} builds the whole scene procedurally (URDF meshes, armature, scanner, cameras, light, jaw import with backface
 culling, Cycles settings), and \code{mirror.py} runs the socket server in Blender: it applies the received joint angles and TCP position, executes
 the requested left/right Cycles renders per waypoint and reports progress. Finally, \code{visualize_scan.py} implements an additional tooling to visualize the
-rendered image datasets with numpy.
+rendered image datasets with NumPy.
 
 \subsubsection{Configuration}\label{ms:config}
 
@@ -237,7 +237,7 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \midrule
         \multicolumn{3}{l}{\textit{Robot and kinematics}} \\
         \midrule
-        \code{TOOL_OFFSET_POS} & tcp offset that changes the tcp position from wrist\_3 to the top of the scanner & \code{[0.213, 0, -0.006]} \\
+        \code{TOOL_OFFSET_POS} & TCP offset that changes the TCP position from wrist\_3 to the top of the scanner & \code{[0.213, 0, -0.006]} \\
         \code{TOOL_OFFSET_ORN} & tool offset orientation (quaternion, unused) & \code{[0, 0, 0, 1]} \\
         \code{SCANNER_BASE_ORN_DEG} & fixed scanner base rotation (deg); must stay consistent across camera, demo and Blender & \code{[0, -90, 0]} \\
         \code{GEBISS_COLL_CELL} & voxel cell size for collision mesh decimation (mm) & \code{1.5} \\
@@ -256,39 +256,38 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{CAMERA_FOV_DEG} & horizontal field of view (deg) & \code{87} \\
         \code{CAMERA_LENS_MM} & focal length derived from sensor width and FOV (mm) & \code{18.97} \\
         \code{CAMERA_LATERAL_OFFSET} & lateral offset of one camera from the scanner axis (m); \code{baseline_m = 2 x offset} & \code{0.0017} \\
-        \code{CAMERA_NEAR_M} & blender near clipping plane (m) & \code{0.001} \\
-        \code{CAMERA_FAR_M} & blender far clipping plane (m) & \code{0.04} \\
+\code{CAMERA_NEAR_M} & Blender near clipping plane (m) & \code{0.001} \\
+\code{CAMERA_FAR_M} & Blender far clipping plane (m) & \code{0.04} \\
         \code{CAMERA_DISPLAY_M} & frustum display range (m) & \code{0.2} \\
         \midrule
         \multicolumn{3}{l}{\textit{Rendering}} \\
         \midrule
         \code{RENDER_W}, \code{RENDER_H} & render resolution (px) & \code{1920} / \code{1080} \\
-        \code{RENDER_ENGINE} & blender render engine & \code{CYCLES} \\
-        \code{RENDER_DEVICE} & blender render device & \code{GPU} \\
+\code{RENDER_ENGINE} & Blender render engine & \code{CYCLES} \\
+\code{RENDER_DEVICE} & Blender render device & \code{GPU} \\
         \code{RENDER_TIMEOUT} & timeout per render pair (s), abort on exceedance & \code{900} \\
         \code{RENDER_TRANSPARENT} & toggles transparency of the rendered images & \code{false} \\
         \midrule
         \multicolumn{3}{l}{\textit{PyBullet GUI}} \\
         \midrule
-        \code{PB_CAMERA_DISTANCE} & Pybullet GUI camera distance to target (m) & \code{1.0} \\
-        \code{PB_CAMERA_YAW} & Pybullet GUI camera yaw (deg) & \code{70} \\
-        \code{PB_CAMERA_PITCH} & Pybullet GUI camera pitch (deg) & \code{-25} \\
-        \code{PB_CAMERA_TARGET_POS} & Pybullet GUI camera target position (m) & \code{[0.6, 0, 0.4]} \\
+\code{PB_CAMERA_DISTANCE} & PyBullet GUI camera distance to target (m) & \code{1.0} \\
+\code{PB_CAMERA_YAW} & PyBullet GUI camera yaw (deg) & \code{70} \\
+\code{PB_CAMERA_PITCH} & PyBullet GUI camera pitch (deg) & \code{-25} \\
+\code{PB_CAMERA_TARGET_POS} & PyBullet GUI camera target position (m) & \code{[0.6, 0, 0.4]} \\
         \code{PREVIEW_PAUSE} & pause after path preview (s) & \code{0.6} \\
         \code{WAYPOINT_MARKER_RADIUS} & radius for the points that show where the scanner moves to around a jaw (m) & \code{0.001} \\
-        \code{BOOT_START} & roboter pose on program start; \code{None} disables & \code{pos:[0.85, 0, 0.38],}\newline\code{ori:[0, 0, 0]} \\
+        \code{BOOT_START} & robot pose on program start; \code{None} disables & \code{pos:[0.85, 0, 0.38],}\newline\code{ori:[0, 0, 0]} \\
         \midrule
         \multicolumn{3}{l}{\textit{Visualization / debug}} \\
         \midrule
         \code{DRAW_CAMERA_FRUSTUM} & draw camera frustum for the active start position (shows the space the cameras render) & \code{true} \\
         \code{CAMERA_FRUSTUM_COLOR} & frustum color (RGB) & \code{[0.0, 0.55, 1.0]} \\
         \code{CAMERA_FRUSTUM_ALPHA} & frustum transparency & \code{0.2} \\
-        \code{LOOK_TARGET_RADIUS} & look-target marker radius (the look marker is a point to which the view direction of a waypoint can be corrected to, to better the view angle) (m) & \code{0.008} \\
+        \code{LOOK_TARGET_RADIUS} & look-target marker radius (the look marker is a point to which the view direction of a waypoint can be corrected to, in order to better the view angle) (m) & \code{0.008} \\
         \code{LOOK_TARGET_COLOR} & look-target marker color (RGBA) & \code{[0.1, 1.0, 0.3, 0.95]} \\
         \bottomrule
     \end{tabularx}
 \end{table*}
-\newpage
 \begin{table*}[!t]
     \centering
     \footnotesize
@@ -306,7 +305,7 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
         \code{GEBISS_SCALE} & jaw mesh scale (mm to m) & \code{[0.001, 0.001, 0.001]} \\
         \code{GEBISS_ROUGHNESS} & Principled BSDF roughness of the jaw material & \code{0.8} \\
         \code{GEBISS_SPECULAR} & specular IOR level of the jaw material & \code{0.2} \\
-        \code{GEBISS_SHADING} & blender jaw shading mode: \code{flat}/ \code{smooth}/ \code{auto_smooth} & \code{auto_smooth} \\
+        \code{GEBISS_SHADING} & Blender jaw shading mode: \code{flat}/ \code{smooth}/ \code{auto_smooth} & \code{auto_smooth} \\
         \code{GEBISS_AUTO_SMOOTH_ANGLE_DEG} & auto-smooth angle threshold (deg) & \code{30} \\
         \midrule
         \multicolumn{3}{l}{\textit{Blender}} \\
@@ -340,22 +339,22 @@ load, into Blender. Table~\ref{tab:ms-config-entries} lists the parameters toget
 The project is available under the dentavision GitHub organisation \cite{ur5e_bullet_repository}. It requires Python~$\geq$~3.14, Poetry~$\geq$~2.x and
 a GUI-capable Blender build available as \code{blender} on the \code{PATH}. The Poetry-managed simulation dependencies
 (PyBullet, \code{pybullet-planning}, NumPy, matplotlib) are installed in the project directory with \code{poetry install}, which installs the dependencies from \code{pyproject.toml}.
-After that the program can be started by running either \code{poetry run ur5e} or \code{poetry run python -m ur5e_bullet} in the project root.
+After that, the program can be started by running either \code{poetry run ur5e} or \code{poetry run python -m ur5e_bullet} in the project root.
 On boot the arm moves to the \code{BOOT_START} pose without a jaw model loaded. The \code{>} prompt accepts the basic move and inspection commands:
 
 \begin{itemize}[leftmargin=*]
-    \item \code{m x y z [rx ry rz]} moves the TCP via RRT (asks for confirmation; orientation defaults to \code{0 0 0}). The position values should not exceed 1m in any direction due to the operational range of the robot arm (will throw an error) and the x value should be kept out of the negative range as the IK solutions tend to become somewhat unpredictable in the area behind the robot. Accepted inputs for the command would be for example \code{m 0.85 0 0.4} or \code{m 0.6 0.3 -0.4 180 90 0}.
+    \item \code{m x y z [rx ry rz]} moves the TCP via RRT (asks for confirmation; orientation defaults to \code{0 0 0}). The position values should not exceed 1\,m in any direction due to the operational range of the robot arm (will throw an error) and the x value should be kept out of the negative range as the IK solutions tend to become somewhat unpredictable in the area behind the robot. Accepted inputs for the command would be for example \code{m 0.85 0 0.4} or \code{m 0.6 0.3 -0.4 180 90 0}.
     \item \code{o x y z} sets the tool offset. This is only useful for testing the offset value of new robot attachments instead of the current scanner model, as the correct offset of the current scanner is loaded from config.py.
-    \item \code{s <speed>} sets the global move speed (default \code{0.5}). This influences the speed with which the robot arm drives aloong the rrt path of a movement.
-    \item \code{@} resets the robot to the last joint configuration. This is needed, because the Pybullet GUI cant be configured to not let the mouse cursor interact with scene objects. So if clicking on the robot throws it off its position, this is for resetting that.
-    \item \code{jaw <nr> [upper|lower]} loads the jaw mesh from \code{data/meshes_jaws/<nr>} into PyBullet and Blender. This can only be done, when a jaw has already been loaded by a start position.
-    \item \code{q} quits the interactive loop and closes the simulation including blender.
-    \item \code{start <name>} drives the robot to the start position <name> if defined in START\_POSITIONS in config.py.
+    \item \code{s <speed>} sets the global move speed (default \code{0.5}). This influences the speed with which the robot arm drives along the RRT path of a movement.
+    \item \code{@} resets the robot to the last joint configuration. This is needed, because the PyBullet GUI can't be configured to not let the mouse cursor interact with scene objects. So if clicking on the robot throws it off its position, this is for resetting that.
+    \item \code{jaw <nr> [upper|lower]} loads the jaw mesh from \code{data/meshes_jaws/<nr>} into PyBullet and Blender. This can only be done when a jaw has already been loaded by a start position.
+    \item \code{q} quits the interactive loop and closes the simulation including Blender.
+    \item \code{start <name>} drives the robot to the start position <name> if defined in \code{START_POSITIONS} in config.py.
 \end{itemize}
 
 \subsubsection{Defining start positions}\label{ms:start-positions}
 
-A start position bundles a target TCP pose, the jaw placement, orientation anchors, the camera view and further parameters for a waypoint generator. The entire goal of this composition is to define a function, that creates waypoints along a parabel, which are suited to the specific side of the jaw that has to be scanned from them. The config.py in the repository\cite{ur5e_bullet_repository} already contain start positions for the first jaw, meaning waypoint parabel configurations for the outer inner and upper side of its upper and lower jaw halves.
+A start position bundles a target TCP pose, the jaw placement, orientation anchors, the camera view and further parameters for a waypoint generator. The entire goal of this composition is to define a function, that creates waypoints along a parabola, which are suited to the specific side of the jaw that has to be scanned from them. The config.py in the repository~\cite{ur5e_bullet_repository} already contains start positions for the first jaw, meaning waypoint parabola configurations for the outer, inner and upper side of its upper and lower jaw halves.
 \begin{lstlisting}[caption={start position example}, label={lst:ms-start_pos_example}, language=Python]
 {
   "a1l": {
@@ -400,7 +399,7 @@ A start position bundles a target TCP pose, the jaw placement, orientation ancho
 The following points describe how the configuration entries can be used to influence the waypoint generation:
 
 \begin{itemize}[leftmargin=*]
-    \item \code{tcp_pos} and \code{tcp_ori_deg}: These two values define the position and orientation the robot drives to before the jaw gets loaded. The position is supposed to be located at the origin of the parabel \ref{fig:ms-waypoint_example_front}
+    \item \code{tcp_pos} and \code{tcp_ori_deg}: These two values define the position and orientation the robot drives to before the jaw gets loaded. The position is supposed to be located at the origin of the parabola (Figure~\ref{fig:ms-waypoint_example_front}).
     \begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_front}
@@ -412,13 +411,13 @@ The following points describe how the configuration entries can be used to influ
     \item \code{jaw_folder} / \code{jaw_type}: Jaw mesh directory under \code{data/meshes_jaws/} and side (\code{upper} / \code{lower}).
     \item \code{generator}: Callable that computes the waypoints from this config (e.g.\ \code{parabola_waypoints}); \code{waypoints} is a static
     list fallback when no generator is set.
-    \item \code{parabola.x0}: This is the world x position of the origin of the parabel. Should equal to the x value of \code{tcp_pos}.
-    \item \code{parabola.a}: This is the multiplicator of the parabel. With this its possible to stretch the height of the parabel along the world x axis.
-    \item \code{parabola.z}: Corresponds to the height at which the parabel lies flat down. Should equal the z value of \code{tcp_pos}.
-    \item \code{parabola.n}: Configures the amount of waypoints that are generated along the parabel. The number should be odd so the center waypoint lands on the \code{tcp_pos}.
-    \item \code{parabola.y_max}: This configures the span between the two outermost waypoints, or in other words, the range between the two ends of the parabel.
-    \item \code{parabola.power}: With this its possible to chose the power of the parabel. Mostly only 2 and for are needed here.
-    \item \code{ori_anchors}: The point of the orientation anchors is to define 3 orientations at the origin and at each end of the parabel. the orientation of the robot at the paypoints between these anchors is interpolated with these values. The images here show the start\ref{fig:ms-waypoint_example_left} mid\ref{fig:ms-waypoint_example_front} and end\ref{fig:ms-waypoint_example_right} orientation anchor positions.
+    \item \code{parabola.x0}: This is the world x position of the origin of the parabola. Should equal the x value of \code{tcp_pos}.
+    \item \code{parabola.a}: This is the multiplicator of the parabola. With this it's possible to stretch the height of the parabola along the world x axis.
+    \item \code{parabola.z}: Corresponds to the height at which the parabola lies flat down. Should equal the z value of \code{tcp_pos}.
+    \item \code{parabola.n}: Configures the amount of waypoints that are generated along the parabola. The number should be odd so the center waypoint lands on the \code{tcp_pos}.
+    \item \code{parabola.y_max}: This configures the span between the two outermost waypoints, or in other words, the range between the two ends of the parabola.
+    \item \code{parabola.power}: With this it's possible to choose the power of the parabola. Mostly only powers 2 and 4 are needed here.
+    \item \code{ori_anchors}: The point of the orientation anchors is to define 3 orientations at the origin and at each end of the parabola. The orientation of the robot at the waypoints between these anchors is interpolated with these values. The images here show the start~\ref{fig:ms-waypoint_example_left}, mid~\ref{fig:ms-waypoint_example_front} and end~\ref{fig:ms-waypoint_example_right} orientation anchor positions.
     \begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{assets/manuel/pybullet/waypoint_example_left}
@@ -431,12 +430,12 @@ The following points describe how the configuration entries can be used to influ
     \caption{Scanner at W\_max with the orientation of the end anchor}
     \label{fig:ms-waypoint_example_right}
     \end{figure}
-    \item \code{look_at_jaw}: This is an additional toggle that changes the orientation generation additionally to the interpolation of the orientation anchors. It changes the orientation slightly, so the view direction looks exactly at the point defined in \code{look_target}, which ensures that the gradient of the view direction lies on the same level as the parabel. This helps to create a more direct vieweing angle on the tooth surface, but is only useful for the scan of the outer side o a jaw.
-    \item \code{view}: Here the Pybullet GUI camera viewpoint can be customized for a start position, so the user doesn't have to manually drag the camera there.
+    \item \code{look_at_jaw}: This is an additional toggle that changes the orientation generation additionally to the interpolation of the orientation anchors. It changes the orientation slightly, so the view direction looks exactly at the point defined in \code{look_target}, which ensures that the gradient of the view direction lies on the same level as the parabola. This helps to create a more direct viewing angle on the tooth surface, but is only useful for the scan of the outer side of a jaw.
+    \item \code{view}: Here the PyBullet GUI camera viewpoint can be customized for a start position, so the user doesn't have to manually drag the camera there.
     \item \code{view.apply}: This is a toggle, with which the camera position change can be turned on or off.
     \item \code{view.distance}: This defines the distance of the camera from the target position.
-    \item \code{view.yaw/pitch}: Yaw and pitch of the camera. Pitch can't be 90° because a pybullet bug lets the whole scenery disapper, when it has that value.
-    \item \code{view.target}: the x y z position onto which the camera looks and revolves around.
+    \item \code{view.yaw/pitch}: Yaw and pitch of the camera. Pitch can't be 90° because a PyBullet bug lets the whole scenery disappear when it has that value.
+    \item \code{view.target}: The x y z position onto which the camera looks and revolves around.
 \end{itemize}
 
 The default configuration ships six positions for the three lower (\code{a1l}, \code{o1l}, \code{i1l}) and three upper arches (\code{a1u},
@@ -445,16 +444,16 @@ The default configuration ships six positions for the three lower (\code{a1l}, \
 
 Once a start position is active, the following additional commands can be used:
 \begin{itemize}[leftmargin=*]
-    \item \code{+/-}: Can be used either only as \code{+/-} to let the robot drive to the next upper/lower waypoint or as \code{+/- <n>}, which drives the robot <n> waypoints in the chosen direction.
-    \item \code{scan <n>}: This allows to render a specific number <n> of waypoints, which was mostly used to test the metadata generation of the scan process.
-    \item \code{scan-all <start1> [start2 ...]}: This command allows to render multiple start positions sequentially, which makes it possible to automate the hour long rendering process of multiple start positions.
+    \item \code{+/-}: Can be used either only as \code{+/-} to let the robot drive to the next upper/lower waypoint or as \code{+/- <n>}, which drives the robot by <n> waypoints in the chosen direction.
+    \item \code{scan <n>}: This allows rendering a specific number <n> of waypoints, which was mostly used to test the metadata generation of the scan process.
+    \item \code{scan-all <start1> [start2 ...]}: This command allows rendering multiple start positions sequentially, which makes it possible to automate the hour-long rendering process of multiple start positions.
 \end{itemize}
 
 The process of fully rendering a start position is visualized in Figure~\ref{fig:ms-scan-workflow}. First, a scan folder is created and the initial \code{render_settings.json} is written;
 the robot then drives to the first approach pose (RRT) and sequentially moves along the waypoints to W0 without rendering. For each further waypoint it repeats the same
 sequence: the robot moves to the next waypoint, the left/right camera poses are computed in the jaw frame and written to
 \code{<n>_pose.json}, and a render request for the left and right image is sent to Blender. Blender renders both views via Cycles on the GPU, stores
-the PNGs in the scan folder and reports completion. After the last waypoint \code{render_settings.json} is updated with the measured \code{render_duration_s}.
+the PNGs in the scan folder and reports completion. After the last waypoint, \code{render_settings.json} is updated with the measured \code{render_duration_s}.
 
 \begin{figure}[!t]
     \centering
