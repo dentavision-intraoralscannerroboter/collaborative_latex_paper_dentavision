@@ -1,55 +1,142 @@
 \section{Introduction}
-DentaVision Control Panel is a Graphical User Interface, that Intraoral Scanning sureci boyunca end user ile interact etmeye araci olan conceptual(burda bu ui robot simulasyonu ile henuz bagli olmadigi ve gelecek Implementationlarda belki yapilabilecegi icin conceptual demek istedim yanlissa alternatif bi kelime bul) bir aractir.  
+Automating parts of the intraoral scanning procedure with the help of a robotic arm is a theme, motivated by the goal of reducing dependence on the operator and making the procedure more comfortable for the patient. 
+A system built around this idea needs some way for an operator to interact with it: something that shows the state of the procedure, lets the operator choose what needs to be scanned, and turns information about the patient into values that the robotic arm can use to reach the correct position.
 
+\textit{DentaVision Control Panel} is a touchscreen graphical user interface built with Qt Creator that functions as a control panel for a dental scanning procedure. 
+The interface tracks the patient's head position and orientation in real time through a camera and estimates the target coordinates that a robotic arm would need to reach in order to position its scanning tool at a selected tooth.
+The system brings together three main parts in a single control panel: a dental chart using FDI numbering that lets the operator select the tooth to be scanned, 
+a pipeline that uses computer vision to detect the patient's face 
+and mouth region and continuously estimate head position and orientation from the camera feed, 
+and a stage that converts the detected head pose and the selected tooth into a target pose estimation in the coordinate space used by the robotic arm.
 
+The panel itself is limited to producing this target pose; it does not compute the joint level motion of the robotic arm and does not perform any part of the scan. 
+
+At the current stage, DentaVision Control Panel runs as a standalone prototype: the tracking, stabilization, and target estimation described above are fully implemented and aims to produce real values from a live camera feed. However, the interface is not yet connected to a physical robotic arm or to the simulation. Therefore, the control panel does not know the details of any robotic platform.
 \subsection{Purpose}
- Proje kapsaminda saglik personeli tarafindan kullanilmak uzere bir graphical user interface gelistirilmeye karar verildi. 
- Bu arayuzun ana amaci, scanning sirasinda moderation yapacak personele uygun graphical destek saglamak ve oral scanning yapilacak hastanin guvenligi icin kafasinin sabit oldugunu kontrol eden bir sistem implemente etmek.
- Bu sistem, automation kapsaminda computer vision (bu terimin buraya uygunlugundan emin degilim kontrol et gerekirse alternatif bul) kullanilarak hastanin dis arkinin olculerini estimate ederek robotun ilerleyecegi konumu belirlemeyi denerken asamaya ozel komut butonlariyla sureci daha guvenli kilmaya calisir. 
- Bunun yani sira, GUI'Da robot pozisyonlarinda manuel adjustmentlar yapilabilmesini saglayan bir panel ile gerektigi durumlarda saglik personeline yetki verilerek anpassung yapilabilmesini ongorur.    
+The graphical user interface described is intended to be used by healthcare personnel during an oral scanning procedure and it mainly serves two goals: to give the personnel supervising the procedure clear visual feedback on its state, and to help protect the patient by checking that the patient's head stays stable before and during scanning.
 
+To support this second goal, the system relies on the head tracking and target estimation described earlier to flag whether the patient's head is stable enough for the scan to proceed. Command buttons tied to each stage of the procedure keep this process under the operator's control rather than letting it run on its own. Alongside this, the interface also reserves a panel for manual adjustment of the robotic arm's position, so that healthcare personnel can step in and correct the position themselves whenever it is judged necessary.
 \subsection{Scope}
+\label{sec:scope}
 
-Control Panel gelecek implementationda/ bir sonraki adimda roboter arm trajeksiyon logici ile birlestirelerek kullanilmasina yonelik conceptual oalrak gelistirilmistir. (bu cumle inverse kinematics ile desteklenebilir mi ?)
-DentaVision, bir dental tarama işlemi sırasında hastanın kafa pozisyonunu kamera üzerinden gerçek zamanlı olarak takip eden ve operatörün seçtiği dişe göre bir robot kolun ulaşması gereken hedef koordinatları (X, Y, Z, RX, RY, RZ) hesaplayan bir kontrol panelidir. Sistem; MediaPipe Face Mesh ile yüz ve ağız tespiti yapmakta, ağzın kameradaki referans noktasına göre konumunu ve oryantasyonunu 2D landmark verilerinden kestirmekte, seçilen dişin sabit anatomik ofsetini bu kafa pozisyonuna ekleyerek Tooth Target'ı üretmekte ve Start → Scan → Pause olarak tanımlanan dört fazlı bir iş akışıyla operatörü yönlendirmektedir. Buna ek olarak, Joint Control panelinden yapılan manuel jog hareketleri, bu hesaplanan hedef baz alınarak (baseline) terminale yazdırılmaktadır.
+The control panel is developed with the expectation that, at a later stage, the target pose it computes could be handed to a robotic system that resolves it into joint motion through inverse kinematics.
+At its current stage, values produced by manual jog operations on the Joint Control panel are only printed to the terminal rather than sent to any robotic hardware.
 
-Projenin kapsamı, yazılım ve algoritma seviyesindeki bu hesaplama ve kullanıcı arayüzü mantığıyla sınırlıdır; gerçek bir robot kol donanımına bağlantı içermemekte, hesaplanan eklem değerleri yalnızca terminale yazdırılmaktadır. Kafa pozisyonu kestirimi, cv2.solvePnP tabanlı gerçek bir 3D poz kestirimi ya da kamera iç/dış kalibrasyon matrisi kullanmamakta; bunun yerine basitleştirilmiş bir 2D landmark geometrisine dayanmaktadır. Benzer şekilde, diş hedefi hesaplamasında kullanılan diş yayı (dental arch) modeli hastaya özel bir ölçümden değil, sabit ve genel bir geometrik şablondan türetilmektedir. Sistem, hastanın muayene boyunca sabit bir koltuk ve headrest düzeninde, kameraya sabit bir mesafede konumlandığını varsaymakta; bu nedenle piksel–gerçek dünya dönüşümü, tek bir sabit mesafe için kalibre edilen bir ölçekleme sabiti ile yapılmaktadır.
+The scope of this work is limited to the software and algorithm level: the interface logic, the head tracking pipeline, and the target coordinate calculation described above, without the hardware integration mentioned above.
+
+The head position estimate produced by the system does not rely on a full 3D pose estimation method, and does not use a camera calibration matrix. Instead, it is derived from a simplified geometric relationship between the 2D landmark positions returned by MediaPipe Face Mesh. Likewise, the offset used to obtain the target position for a given tooth comes from a fixed, generic dental arch template rather than a measurement taken from the individual patient. 
+
+Finally, the system assumes that the patient remains at a fixed distance from the camera throughout the procedure, using a chair and headrest arrangement that keeps this distance constant; the conversion from pixel distances to real-world distances is therefore based on a single scale constant calibrated for that one fixed distance, rather than a distance measured continuously.
+
 \subsection{Terminology}
+\label{sec:terminology}
 
 \subsubsection{FDI Tooth Numbering}
-\subsubsection{XYZ RX RY RZ}
+\label{sec:fdi}
+The system identifies teeth using the two-digit FDI (F\'ed\'eration Dentaire Internationale) notation. The first digit denotes the quadrant, and the second digit denotes the tooth's position within that quadrant, counted from the midline outward. Table~\ref{tab:fdi-quadrants} lists the four quadrants, and Table~\ref{tab:fdi-positions} lists the tooth name corresponding to each position digit; concatenating a quadrant digit with a position digit yields the full FDI number and, in combination, the tooth's full name (e.g.\ $26$ = Quadrant~2 + Position~6 = Upper Left First Molar).
 
+\begin{table}[h]
+\centering
+\caption{FDI quadrants}
+\label{tab:fdi-quadrants}
+\begin{tabular}{cll}
+\toprule
+Quadrant & Jaw & Side \\
+\midrule
+1 & Maxilla (upper) & Right \\
+2 & Maxilla (upper) & Left \\
+3 & Mandibula (lower) & Left \\
+4 & Mandibula (lower) & Right \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\section{System Overview}
+\begin{table}[h]
+\centering
+\caption{FDI tooth positions (second digit)}
+\label{tab:fdi-positions}
+\begin{tabular}{cl}
+\toprule
+Position & Tooth \\
+\midrule
+1 & Central Incisor \\
+2 & Lateral Incisor \\
+3 & Canine \\
+4 & First Premolar \\
+5 & Second Premolar \\
+6 & First Molar \\
+7 & Second Molar \\
+8 & Third Molar \\
+\bottomrule
+\end{tabular}
+\end{table}
 
+\subsubsection{X, Y, Z and RX, RY, RZ}
+They represenet a complete description of an object's position and orientation in three-dimensional space, expressed as six numbers: $(x, y, z, r_x, r_y, r_z)$.
 
-\subsection{Arhitecture}
-DentaVision is organized as a processing pipeline that turns a
+The first three values, $x$, $y$, and $z$, describe where the object is located along three perpendicular axes of a fixed reference frame. Together they behave like a 3D address: moving along $x$ shifts the object left or right, along $y$ shifts it up or down, and along $z$ shifts it in depth, toward or away from a reference point.
+
+The last three values, $r_x$, $r_y$, and $r_z$, describe how the object is rotated, independently of where it is. These follow the common aviation-style convention:
+\begin{itemize}
+    \item \textbf{RX / pitch}: Rotation that tilts the object up or down, like nodding.
+    \item \textbf{RY / yaw}: Rotation that turns the object left or right, like shaking your head "no".
+    \item \textbf{RZ / roll}: Rotation that tilts the object side to side, like tilting your head toward one shoulder.
+\end{itemize}
+
+Together, these six values fully define both where something is and how it is angled, without needing any further information. This is the standard way a target pose is communicated between the different parts of the system throughout this report.
+
+\subsubsection{Maxilla and Mandibula}
+\emph{Maxilla} and \emph{Mandibula} are the anatomical terms for the upper and lower jaw.
+
+\subsubsection{Facial Landmarks and Face Mesh}
+A \emph{facial landmark} is a specific, identifiable point on a face, for instance, the corner of the mouth, the tip of the nose or the edge of an eye, detected automatically from a camera image.
+A \emph{face mesh} is the complete set of such landmarks arranged over the face. 
+
+\subsubsection{Inverse Kinematics (IK)}
+\emph{Inverse kinematics} is the process of determining the joint angles a robotic arm must take in order to place its end effector at a desired pose. 
+It is the counterpart to \emph{forward kinematics}, which computes the resulting pose from a given set of joint angles. Sincea single pose can often be reached through more than one joint configuration, and because some poses may lie outside the arm's physical reach, inverse kinematics is generally a more involved problem than forward kinematics, and typically requires a dedicated solver.
+
+\section{System Overview} 
+
+\subsection{Architecture}
+DentaVision Control Panel is organized as a processing pipeline that turns a
 live camera feed into an absolute Tooth Target position. At
-every frame, the system moves through four stages: \textbf{camera input
-acquisition}, \textbf{facial and mouth detection}, \textbf{geometric
-computation}, and \textbf{panel display}. Each stage is implemented as a
-separate module with a single responsibility, so that the
+every frame, the system moves through four stages: 
+
+\begin{itemize}
+    \item \textbf{camera input acquisition}, 
+    \item \textbf{facial and mouth detection}, 
+    \item \textbf{geometric computation},
+    \item \textbf{panel display}. 
+\end{itemize}
+
+Each stage is implemented as a separate module aiming for single responsibility, so that the
 detection logic knows nothing about robot motion, and the display layer
-knows nothing about how a coordinate was derived. Figure~\ref{fig:overview}
-summarizes this flow:
+knows nothing about how a coordinate was derived.
 
-\begin{figure}[ht]
+Figure~\ref{fig:userflow} shows this structure as it is implemented in the codebase. At the top, main creates and wires together the five controllers: camera\_controller, dental\_chart\_controller, tooth\_target\_controller, joint\_motion\_controller, and tooth\_badge\_controller. camera\_controller is the only one that depends on the vision package, while the remaining controllers depend on core for teeth data, tooth targets, and phase state, and on ui for the widgets they update. Both vision and core are leaf packages in this structure: they are depended on by the controllers above them but do not themselves depend on any other package, which keeps detection and computation logic independent of how the panel is built. Inside ui, most modules form a single chain centered on mainwindow, with a few of them reaching directly into core for shared enums or into assets.
+\begin{figure}[t]
     \centering
-    \includegraphics[width=1.1\columnwidth]{ui_assets/overview.png}
-    \caption{System Organization Overview drawn in Excalidraw}
-    \label{fig:overview}
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/diagrams/class_diagram.png}
+    \caption{Class Diagram of DentaVision Control}
+    \label{fig:userflow}
 \end{figure}
-
 
 \subsection{Data Flow}
 
+The flow starts with the raw image captured by the camera. Each frame passes through the stage that detects the face and mouth region; the output of this stage is the patient's current head position and orientation. This estimate is written to a single head position object shared across the system and is updated on every new frame. At the same stage, the reliability of this estimate is also checked: the head must stay close enough to the target reference point, and it must not move too much over several consecutive frames. Only when both conditions are met does the system enter the stabilized state, and no action, including tooth selection or starting a scan, is allowed while the head position is not stabilized.
 
+Once the head position is stabilized, the operator selects a tooth through the interface. The FDI label of the selected tooth (see \autoref{sec:fdi}) is then combined with the current head position: the tooth's precomputed angular and depth offsets, together with its fixed geometric position on the dental arch, are added to the current head position to produce the final Cartesian target the robotic arm needs to reach. This target is both displayed numerically on the panel and passed on to the motion control stage.
+
+In the motion control stage, this target is taken as a baseline pose. Once the conditions required to use this panel are met (see \autoref{sec:motion_control}), the operator can apply small corrections on top of this baseline through the joystick and rotation controls in the interface. At this stage, the system tracks a small set of states through a ScanFlow (idle, aligning, scanning, paused) to determine when alignment is complete, when scanning can begin, and when it should be paused; these phases are triggered by stabilization and by operator interaction, and their status is shown on the panel.
+
+In the final step, the computed Cartesian target must be converted into the joint angles that would move the physical robot; this conversion is performed through inverse kinematics (see \autoref{sec:terminology}). This step is not part of the current system: the data flow described here ends at the point where the Cartesian target is produced and made available to that step (see \autoref{sec:limitations}).
 
 \subsection{Dependencies and System Requirements}
 
-The panel logici python ve design qt araciligiyla gelistirildi. Panelde bulunan kamera ve face detection icin OpenCV ve MediaPipe gibi python computer vision kutuphaneleri kullanildi. 
-Baslica kullanilan componentleri Tablo~\ref{tab:dependencies}de gorulmektedir.    
+The panel's logic was implemented in Python, with the interface designed using Qt. 
+Camera capture and face detection rely on the Python computer vision libraries introduced earlier, OpenCV and MediaPipe. 
+The main components used throughout the project are listed in Table~\ref{tab:dependencies}.
 
 
 \begin{table}[h]
@@ -70,394 +157,544 @@ Baslica kullanilan componentleri Tablo~\ref{tab:dependencies}de gorulmektedir.
 \end{table}
 
 \subsection{Operating Environment and Physical Setup Assumptions}
-DentaVision Control Panelin dogru calismasi icin varsayilan fiziksel bir kurulum bulunmaktadir:
+The correct operation of DentaVision Control Panel relies on a set of assumptions about the physical setup it is used in:
 
 \begin{itemize}
-    \item Control Paneli touchable bir screen olarak dusunulmustur ve saglik personeli bu paneldeki componentleri dokunmatik olarak kullanir/kontrol eder.
-    \item Calisan bir webcam veya USB kamera gereklidir, Mediapipe CPU uzerinde de calisabildiginden GPU gerekli degildir. (bu bilgi gerekli mi?) 
-    \item Patient klinikte bulunan sabit bir dental koltukta, kafasi dental head stabilizer ile sabitlenmis bir sekilde oturur. Muayene boyunca kafa poziyosnu fix kalir, asagi yukari veya saga sola hareket etmez.
-    \item Koltugun yuksekligi ve kameraya olan mesafesi visionun guvenilirligini etkilemeyecek bir mesafede ayarlanir ve sabit kabul edilir.
-    \item Panelde görülen kamera bir konuma sabit monte edilir ve hareket etmez.
-    \item Kamera ve Kontrol Panel ayni cihazda bulunabilirken, hasta koltuguna entegre edilen external bir kamera da kullanilabilir.
-    \item Odadaki isiklandirma kamera gorus acisi icin optime edilir veya kameranin gordugu alana manuel bir isik eklenmelidir.
+    \item The control panel is designed as a touchscreen, and healthcare personnel interact with its components by touch.
+    \item A working webcam or USB camera is required; since MediaPipe can run on a CPU, a GPU is not required.
+    \item The patient sits in a fixed dental chair, with the head held in place using a dental head stabilizer. The head position stays fixed throughout the examination and does not move up, down, or side to side.
+    \item The height of the chair and its distance from the camera are set so as not to affect the reliability of the vision pipeline, and this distance is treated as constant.
+    \item The camera used by the panel is mounted at a fixed position and does not move.
+    \item The camera and the control panel may be part of the same device, or an external camera integrated into the patient chair may be used instead.
+    \item The lighting in the room is expected to be suitable for the camera's field of view, or additional lighting should be added manually to the area the camera covers.
 \end{itemize}
 
-Bu setuplar ile kamera ve hasta arasi hep sabit bir mesafede oldugu icin HeadPosition.z degeri kameradan olculmez, sabit bir baseline degeri olarak alinir. 
-Ayni zamanda, bu sabit olcum sayesinde kameradaki bir pixelin kac cme denk geldigini ifade eden CM\_PER\_PIXEL kalibrasyon sabiti tek bir ölcümle belirlenebilir ve tooth targetin hastanin agiz boyutuna daha uyumlu calismasi hedeflenmektedir.
-Koltuk veya kamera yeri degisirse yeniden kalibrasyon gerekmektedir. 
+As noted in the Scope, this setup keeps the distance between the camera and the patient fixed. In practice, this means that \texttt{HeadPosition.z} is not measured from the camera and is instead kept at a constant baseline value, and it is what allows the \texttt{CM\_PER\_PIXEL} calibration constant, which expresses how many centimeters a single camera pixel corresponds to, to be determined from a single measurement. If the chair or the camera is moved, this calibration needs to be repeated.
 
 \section{User Interface Design}
-Control panel UI Designinda MEdical ortama ve personal user experiencei icin user flow Figure~\ref{fig:userflow} dusunulup olabildigince optimal bir sekilde gerceklestirilmeye calisilmistir. 
+The UI design of the control panel was guided by a user flow (Figure~\ref{fig:userflow}) built with the medical environment and the personnel's user experience in mind, and the implementation was kept as close to this flow as possible.
 
-
-\begin{figure}[t]
+\begin{figure}[ht]
     \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/figma_.png}
-    \caption{Figma Control Panel UI Design Layout}
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/user_flow.png}
+    \caption{User Flow Diagram (Excalidraw)}
     \label{fig:userflow}
 \end{figure}
 
-Baslangicta daha basit bir user flow baz alinarak Figma da design ilk versiyonu Figure ~\ref{fig:figma} olusturulmustur ve sonrasinda iterasyonla bu dizayn iyilestirilip implementasyon asamasinda optimize edilmeye devam edilmistir.
+Initially, a simpler user flow was used as a basis to create the first version of the design in Figma (Figure~\ref{fig:figma}), and this design was then refined through iteration and further optimized during implementation.
 
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/user_flow.png}
-    \caption{User Flow Diagramme (Excalidraw)}
-    \label{fig:figma}
-\end{figure}
-
-Bu baglamda su designda su noktalara dikkat edilmistir: 
+In this context, the following points were taken into account in the design:
 
 \begin{itemize}
-    \item AA
+    \item Touch targets, such as buttons and the cells of the dental chart, are sized and spaced for use with a finger, since the panel is operated as a touchscreen rather than with a mouse and keyboard.
+    \item The state of the procedure is communicated mainly through short text labels and color, so the operator can tell whether a face is detected, whether the head is stabilized, and whether scanning is active or paused, at a glance.
+    \item Controls that are not valid in the current phase are disabled rather than hidden. For example, tooth selection is blocked while the head is not stabilized, and the joint motion panel is disabled while scanning is active, so the operator cannot trigger an action the procedure does not allow at that moment.
+    \item The layout is divided into separate, fixed regions for the dental chart, the camera feed, the motion control panel, and the status indicators, so that each part of the procedure has a predictable place on the screen instead of competing for the same space.
+    \item The tooth target and tooth information are shown near the dental chart right after a tooth is selected. and joint control panel is right below this section, so that the operator can see the target values and make adjustments in place.
 \end{itemize}
 
-Design Qt Creator ui dosyasi olusturup Layoutlar, Frameler, QLabellar etc. ile dizayn edilmistir. Figure~\ref{fig:qt}
-Joystick widget gibi bazi ui componentleri complex olmalari nedeniyle py dosyasi ile olusturulmustur.
+The design was built by creating a Qt Creator UI file, using layouts, frames, QLabels, and similar widgets (Figure~\ref{fig:qt} and \ref{fig:object_inspector}). Some components, such as the dental chart, frame display and joystick widget, were implemented directly in a Python file under \textit{ui} folder instead, since their behavior was too complex to define declaratively within Qt Creator.
 
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/qt.png}
-    \caption{Qt Creator UI File}
-    \label{fig:qt}
-\end{figure}
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=\columnwidth,height=0.35\textheight,keepaspectratio]{ui_assets/object_inspector.png}
-    \caption{Qt Creator Object Inspector}
-    \label{fig:object_inspector}
-\end{figure}
 
 \subsection{Main Window Layout}
-Main Window, islem akisini soldan saga ve ustten alta okunacak sekilde 3 panele böler: Solda sirasiyla ustten alta dis secim gostergesi, secilen dis icin tooth targeting sonuclarinin degerleri ve personelin manuel olarak joint hareketlerini kontrol edebilecegi bir motion control modulu bulunmaktadir.
-Ortada ise hedeflenen disin secilmesine olanak saglayan tooth chart paneli bulunmaktadir ve son olarak sagda, canli kamera goruntusu ve sistem stateini gosteren status paneli olmak uzere iki panel bulunmaktadir.
-En ustte layoutta ise Control Panelin logosu ve 3 asamali Start/Scan/Pause butonu bulunur. 
-
-Main Window ilk once Figma'da ilk versiyonu Figure~\ref{fig:mainwindow_first} olusturulmustur. Bu layout supervisor feedbackleri ve gelisen proje degisiklikleriyle use case ve gercek hayat usabilitysine yonelik revize edilmistir. Figure~\ref{fig:mainwindow_current}
+The main window measures 1024x600 pixels and divides the workflow into three panels, meant to be read from left to right and top to bottom. On the left, from top to bottom, are the selected tooth indicator, the tooth targeting values for the selected tooth, and a motion control module that lets personnel manually control joint movement. The center holds the dental chart panel, used to select the tooth to be targeted. On the right are two panels: the live camera feed and a status panel showing the state of the system. At the top of the layout are the control panel's title and the three-stage Start/Scan/Pause button. The first version of the main window was created in Figma (Figure~\ref{fig:mainwindow_first}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/first_version.png}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/first_version.png}
     \caption{First Version of MainWindow}
     \label{fig:mainwindow_first}
 \end{figure}
 
-Güncel:
+This layout was later revised based on supervisor feedback and the project's evolving requirements, with the goal of matching the actual use case and real-world usability more closely. Compared to the first version, manual joint control was implemented, from a set of raw numeric axis readouts to a joystick widget paired with a small set of directional buttons, which is closer to how an operator would actually want to nudge the robotic arm during alignment. The selected tooth and tooth target fields were also changed to show an explicit empty state, such as "No tooth selected" and dashes in place of coordinate values, instead of example values, so the panel reflects what the operator actually sees when the panel is started. Finally, the camera feed and the system status were separated into two distinct areas rather than a single combined block, so that face and head detection status stays visible even when the camera feed itself is empty or not yet running. The resulting layout is shown in the current version of the main window (Figure~\ref{fig:mainwindow_current}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/current_ui_oP.png}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/current_ui_oP.png}
     \caption{Last Version of MainWindow}
     \label{fig:mainwindow_current}
 \end{figure}
 
 \subsection{Tooth Target Panel}
 
-Bu panel 'selected tooth' altinda default (no tooth selected) dis figuru seklinde bir logo bulundurur Figure~\ref{fig:no_tooth_selected_badge}. 
-Dental archtan bir dis secildiginde bu figur yerine secilen disin FDI numarasi gelir ve ismi yaninda yazdirilir. Figure~\ref{fig:tooth_selected_badge} 
+This panel displays, under "Selected Tooth", a default tooth icon when no tooth is selected (Figure~\ref{fig:no_tooth_selected_badge}). Once a tooth is selected from the dental chart, this icon is replaced by the tooth's FDI number together with its name (Figure~\ref{fig:tooth_selected_badge}).
+
+Below the Selected Tooth section is the Tooth Target area, which shows the target coordinates computed for the selected tooth: X, Y, Z for position, and pitch, yaw, roll for rotation. While no tooth is selected, all fields are shown as dashes rather than as zero values (Figure~\ref{fig:tooth_target_}); this is an intentional choice, since showing "0.0" in place of a missing value could be mistaken by the operator for an actual computed measurement, whereas a dash makes clear that no value has been computed yet. Once a tooth is selected, these fields update immediately to show the computed target values together with their unit (Figure~\ref{fig:tooth_target}). The values shown here were originally in millimeters, and were later changed to meters to match the units expected by the PyBullet robot simulation (Figure~\ref{fig:tooth_target_m}).
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/no_tooth_selected.png}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/no_tooth_selected.png}
     \caption{No Tooth Selected Badge}
     \label{fig:no_tooth_selected_badge}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/tooth_selected.png}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_selected.png}
     \caption{Tooth Selected View}
     \label{fig:tooth_selected_badge}
 \end{figure}
 
-Selected Tooth bolumunun altinda Tooth Target alani bulunur. Bu alan secilen dise gore hesaplanan hedef koordinatları, konum icin X,Y,Z ve rotation icin pitch, roll, yaw degerlerini panel kullanicisina gosterir.
-Hicbir dis secilmemisken tum etiketlerin '-' olarak gosterilmesi tercih edilmistir. Figure\ref{fig:tooth_target_} bu, "henüz hesaplanmış geçerli bir değer yok" durumunu "0.0 mm" gibi hesaplanmış bir değerle karıştırmayı önleyen bilinçli bir tercihtir, çünkü 0.0 mm operatör tarafından gerçek bir ölçüm sonucu sanılabilir.
-Ekrandan bir dis secildiginde etiketler, birimleriyle birlikte anlik olarak guncellenir. \ref{}    
- 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/tooth_target_.png}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_target_.png}
     \caption{Tooth Target Landing/Default View}
     \label{fig:tooth_target_}
 \end{figure}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/tooth_target.png}
-    \caption{Tooth Target View}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_target.png}
+    \caption{Tooth Target View with 'mm' Unit}
     \label{fig:tooth_target}
 \end{figure}
 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.895\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/tooth_target_m.png}
+    \caption{Tooth Target View with 'm' Unit}
+    \label{fig:tooth_target_m}
+\end{figure}
 
-\subsection{Manuel Joint Control Panel}
 
-sistem su ..... asamalardayken kullanima aciktir. Manuel motion kontrol ayari yapilabilir.
+\subsection{Manual Joint Control Panel}
+\label{sec:motion_control}
+
+The panel is built around a joystick, used to adjust position along X and Y by dragging its center point away from the middle of the circle. Next to it, a pair of arrow buttons labeled Z is used to move up or down along the vertical axis. To the right of these, three rows of plus/minus button pairs, labeled RX, RY, and RZ, are used to adjust rotation around each of the three axes independently (Figure~\ref{fig:joint_control}). Each adjustment made through these controls is applied on top of the baseline pose described earlier in Data Flow Section, is only printed to the terminal rather than sent to a physical robot (Figure~\ref{fig:joint_terminal}).
+
+As also shown in the state diagram (Figure~\ref{fig:state-diagram}), this panel is enabled while the system is in the \texttt{aligning} or \texttt{paused} states, and is locked during \texttt{scanning}, since a manual correction at that point could interfere with the ongoing scanning motion and put the patient's safety at risk.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/joint_control.png}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/joint_control.png}
     \caption{Joint Control Panel}
     \label{fig:joint_control}
 \end{figure}
 
-BURAYA TERMINAL CIKTISI DA EKLE 
 
-Joint adjustments su caselerde yapilabilmektedir:
+\subsection{Dental Chart Panel}
 
-\begin{itemize}
-    \item A
-\end{itemize}
+The dental chart panel arranges teeth not as a plain list or table, but on an elliptical layout that resembles the geometry of a simplified dental arch, the curve of the upper and lower jaw (Figure~\ref{fig:dental_arch}). The panel includes maxilla (upper jaw) and mandibula (lower jaw) labels to make the arch easier to read. This layout is intended to help personnel locate a tooth more quickly and intuitively than scanning a numbered list would.
 
-\subsection{Tooth Chart Panel}
-
-Dis secim paneli, disleri duz bir liste veya tablo olarak degil, conceptul basitlestirilmis dental bir arkin (ust ve alt cene yayinin) geometrisine benzer eliptik bir duzen uzerinde konumlandirir. Figure~\ref{fig:dental_arch} 
-Panelde dental arki anlamayi kolaylastiran maxilla (upper jaw) ve mandibula (lower jaw) labellari bulunmaktadir.
-Bu tasarim personelin gorsel olarak disi daha hizli ve sezgisel bulmasina yardimci olmayi ongormektedir. Bu sayisal bir listeye gore cognitive load belirgin bir sekilde azaltir. 
+When a tooth is clicked, the tooth selection callback checks whether the patient's head position is stable enough; if it is, the selected tooth's name and FDI number appear as a badge (Figure~\ref{fig:dental_arch_chosen}). If the head position is not stable enough, the system blocks the selection before it happens, so that no tooth target is computed from an unreliable head position while the patient's head is still moving. In this case, a message is printed to the terminal (see \autoref{sec:error_handling}), while on the panel itself the selection is simply not allowed, and the "head is not stabilized" status lets personnel know why.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/dental_arch.png}
+    \includegraphics[width=0.85\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/dental_arch.png}
     \caption{Dental Arch Landing View}
     \label{fig:dental_arch}
 \end{figure}
 
-Bir dise tiklandiginda, (on\_tooth\_selected) hastanin kafa pozisyonu yeterince stabilse secilen disin ismi ve FDI numarasi bir badge Figure~\ref{fig:dental_arch_chosen} olarak gorunur.
-Kafa pozisyonu yeterince stabil degilse sistem secimi bastan engeller, bu sayede hastanin kafasi hareket halindeyken guvenilir olmayan bir Tooth Target uzerinde calisilmasinin onune gecilmesi ongorulur.
-Bu casein error mesaji terminale yazdirilirken, gercek hayattaki karsiliginda panelde secime izin verilmez ve Status olarak "head not stabilized" notificationu sayesinde personel bunun bilincine varir.  
-
-
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/dental_arch_chosen.png}
+    \includegraphics[width=0.85\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/dental_arch_chosen.png}
     \caption{Dental Arch Tooth Chosen View}
     \label{fig:dental_arch_chosen}
 \end{figure}
 
 \subsection{Camera Panel and Status Indicators}
 
-The Camera Panel consists of a live video feed with bounding boxes highlighting the detected face and mouth, with rounded corners framing the detected regions. Figure~\ref{fig:camera} illustrates the interface. In addition, a red point is displayed on the screen to indicate the target position at which the patient's mouth should be centered. This visual reference is intended to assist in monitoring the stability of the patient's head position. A default positional tolerance of 15 pixels is defined around the target point;
- therefore, the patient's mouth is considered to remain within the acceptable stabilization range when its detected position stays within this tolerance.
-Tespit durumuna gore FACE NOT FOUND \ref{}, FACE DETECTED \ref{}, STABILIZATION SUCCESSFUL \ref{}, STABILIZATION ERROR \ref{} etiketleri, renk kodlamasiyla desteklenir ve status bolumunde gosterilir.
+The Camera Panel consists of a live video feed with bounding boxes highlighting the detected face and mouth, with rounded corners framing the detected regions (Figure~\ref{fig:camera}). In addition, a red point is displayed on the screen to indicate the target position at which the patient's mouth should be centered. This visual reference is intended to assist in monitoring the stability of the patient's head position. A default positional tolerance of 15 pixels is defined around the target point; the patient's mouth is therefore considered to remain within the acceptable stabilization range as long as its detected position stays within this tolerance.
+
+Depending on the detection state, the labels FACE NOT FOUND (Figure~\ref{fig:face_not_found}), FACE DETECTED, and HEAD IS NOT STABILIZED (Figure~\ref{fig:head_not_stabilized}) or STABILIZATION SUCCESSFUL (Figure~\ref{fig:stabilization_successful}) are shown in the status area, supported by color coding.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{ui_assets/components/camera.png}
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/camera.png}
     \caption{Camera View with a Human Face Model generated by AI. (Status: Head is not stabilized)}
     \label{fig:camera}
 \end{figure}
 
+After the 'Start' button is clicked the status shows JOINTS ARE MOVING (Figure~\ref{fig:joints_are_moving}), followed by TARGET REACHED (Figure~\ref{fig:target_reached}) once the joints arrive at the target, in this case a 2 seconds buffer to simulate the delay. The operator then makes any necessary manual adjustments and presses the button again, now labeled 'Scan', to begin scanning; if this proceeds without interruption, the status shows SCANNING... (Figure~\ref{fig:scanning}), followed by SCANNING SUCCESSFUL (Figure~\ref{fig:scanning_successful}).
 
-Start butonuna tiklanilarak jointlere hareket komutu verildikten sonra sirasiyla JOINTS ARE MOVING \ref{} ve TARGET REACHED \ref{} etiketleri statuste belirir.
-Sonrasinda kullanici gerekli tatbikleri yaptiktan sonra Scan butonuna basar ve sorunsuz ilerlerse statuste sirasiyla SCANNING... \ref{} ve SCANNING SUCCESSFUL \ref{} belirir. 
-
-
-Status bolumu Camera panelinin hemen altinda bulunur ve personelin sistemdeki akisi ve hastanin guvenligini kontrol etmesine katkida bulunan bir gostergec olarak dusunulmustur.
-Status barinin akis hikayesi su sekildedir:
+The status section is located directly below the camera panel and is intended as an indicator that helps personnel follow the progress of the procedure and monitor the patient's safety. The sequence of states shown by the status area is as follows:
 
 \begin{enumerate}
-    \item default olarak kirmizi renkte FACE NOT FOUND etiketi ile baslar. 
-    \item Kamerada bir yuz detect edildiginde yesil FACE DETECTED etiketi status barina eklenir.
-    \item Eger hastanin kafasi 
+    \item By default, the status area starts in red with the FACE NOT FOUND label (Figure~\ref{fig:face_not_found}).
+    \item Once a face is detected in the camera feed, the label changes to green FACE DETECTED. (Figure~\ref{fig:head_not_stabilized})
+    \item If the patient's head is detected but has not yet stayed within the tolerance around the target point for the required number of consecutive frames, the label changes to HEAD IS NOT STABILIZED (Figure~\ref{fig:head_not_stabilized}), signaling that the patient needs to be repositioned.
+    \item Once the head remains within tolerance for the required number of consecutive frames, the label switches to STABILIZATION SUCCESSFUL (Figure~\ref{fig:stabilization_successful}), and tooth selection becomes possible.
+    \item After a tooth is selected and 'Start' button is pressed, the label changes to JOINTS ARE MOVING (Figure~\ref{fig:joints_are_moving}) while the system waits for the joints to reach the computed target.
+    \item Once the target is reached, the label updates to TARGET REACHED (Figure~\ref{fig:target_reached}).
+    \item When the button, now labeled 'Scan', is pressed to begin scanning, the label changes to SCANNING... (Figure~\ref{fig:scanning}).
+    \item If scanning completes without the head losing stabilization, the label finally shows SCANNING SUCCESSFUL after 2 seconds of delay (Figure~\ref{fig:scanning_successful}).
 \end{enumerate}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/status_face_not_found.png}
+    \caption{(Status 1) FACE NOT FOUND}
+    \label{fig:face_not_found}
+\end{figure}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/status_head_not_stabilized.png}
+    \caption{(Status 2) HEAD IS NOT STABILIZED}
+    \label{fig:head_not_stabilized}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/status_stabilization_successful.png}
+    \caption{(Status 3) STABILIZATION SUCCESSFUL}
+    \label{fig:stabilization_successful}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/status_joints_are_moving.png}
+    \caption{(Status 4) JOINTS ARE MOVING}
+    \label{fig:joints_are_moving}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/status_target_reached.png}
+    \caption{(Status 5) TARGET REACHED}
+    \label{fig:target_reached}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/status_scanning.png}
+    \caption{(Status 6) SCANNING...}
+    \label{fig:scanning}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/components/status_scanning_successful.png}
+    \caption{(Status 7) SCANNING SUCCESSFUL}
+    \label{fig:scanning_successful}
+\end{figure}
 
 
 \subsection{Buttons}
 
-\begin{figure}[h]
+A single button is located in the top layer of the control panel. This button initially appears as the 'Start' button (Figure~\ref{fig:button_start}). When the button is pressed, the same button turns into the 'Scan' button (Figure~\ref{fig:button_scan}), and provided the patient's head is stabilized, the joints begin moving toward the target. Until the target is reached, pressing the button again has no effect, which is reported through the terminal message "Cannot scan yet: target not reached" (see \autoref{sec:error_handling}). Once the joints reach the target, pressing the Scan button turns it into the Pause button (Figure~\ref{fig:button_pause}).
+
+Once the procedure has started, if the patient's head stabilization is lost at any point, the button is disabled and shown in its faded state instead of its normal color, together with a stabilization error indicator. Depending on the phase the system was in when stabilization was lost, this faded state is shown either on the 'Start' button (Figure~\ref{fig:button_start_faded}) or on the 'Scan' button (Figure~\ref{fig:button_scan_faded}); the button becomes usable again once stabilization is restored.
+
+The full transition between these states is shown in Figure~\ref{fig:state-diagram}.
+
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/state_buttons.png}
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/state_buttons.png}
     \caption{State Diagram of Button Transformation created by Claude AI}
-    \label{fig:buttons}
+    \label{fig:state-diagram}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/components/button_start.png}
+    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/components/button_start.png}
     \caption{Start Button View}
     \label{fig:button_start}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/components/button_start_faded.png}
+    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/components/button_start_faded.png}
     \caption{Start Button Faded View}
     \label{fig:button_start_faded}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/components/button_scan.png}
+    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/components/button_scan.png}
     \caption{Scan Button View}
     \label{fig:button_scan}
 \end{figure}
 
-\begin{figure}[h]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/components/button_pause.png}
+    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/components/button_scan_faded.png}
+    \caption{Scan Button Faded View}
+    \label{fig:button_scan_faded}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.45\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/components/button_pause.png}
     \caption{Pause Button View}
     \label{fig:button_pause}
 \end{figure}
 
-
 \section{Vision and Head Tracking}
-Yüz tespiti, \texttt{FaceTracker} sınıfının oluşturduğu MediaPipe Face Mesh
-nesnesiyle (\texttt{static\_image\_mode=False}, \texttt{max\_num\_faces=1})
-yapılır. 
 
-\subsection{Face and Mouth Detection}
+\subsubsection{Head Detection}
+Each frame captured from the camera is first flipped horizontally to produce a mirror image, and its color space is converted from BGR to RGB, since the face tracking model expects RGB input. This frame is then passed to MediaPipe's Face Mesh solution, which, if it finds a face in the image, returns a dense set of landmarks spread across the face. The system is configured to track at most one face at a time, so even if multiple faces are detected, only the first result is used.
 
-\subsection{Calibration}
+Two separate regions are extracted from the resulting set of landmarks. The first is the overall bounding box of the face, built from the minimum and maximum x and y coordinates across all landmark points. The second is a narrower mouth bounding box, obtained by selecting only the landmark indices belonging to the lip region, taken from MediaPipe's own lip topology. The left and right corner points of the mouth are also kept separately, to be used later in the orientation estimate.
 
-\subsection{Position Estimation}
+\subsubsection{Frame Annotation}
+Once the face and mouth have been located, this information is drawn directly onto the frame: a rectangle labeled "FACE DETECTED" is placed around the face bounding box, and a separate rectangle labeled "MOUTH" is placed around the mouth bounding box. These drawings are applied directly to the pixel data; the frame is then converted into a format the interface can display and shown in the video panel together with a fixed red dot marking the target. This red dot represents the fixed reference position the patient's mouth needs to be aligned with.
 
-\subsection{Orientation Estimation}
+\subsubsection{Head Position and Orientation Estimation}
+Once annotation is complete, the center of the mouth bounding box is computed and compared against a fixed target point defined in advance on the screen. This target point is horizontally centered and positioned slightly below the vertical center of the frame. The pixel-wise difference between the mouth center and this target point is converted into a position estimate in real-world units ($x$, $y$) using a known pixel-to-millimeter ratio; this value indicates how far, and in which direction, the patient's head has drifted from the target.
 
-\subsection{Stabilization Check}
+Orientation is estimated using two separate cues. The angle between the mouth's left and right corner points gives how much the head is tilted sideways (roll, $r_z$). How far the mouth center has shifted relative to the center of the overall face bounding box is used as a ratio to estimate how much the head is turned (yaw, $r_y$) and how much it is tilted forward or backward (pitch, $r_x$), and is converted into degrees using a predefined scale factor. The resulting six values ($x$, $y$, $z$, $r_x$, $r_y$, $r_z$) are written to a single head position object shared across the system.
 
+\subsubsection{Stabilization}
+Whether the estimated position is considered reliable is decided through a two-stage check. The first stage is a single-frame check: if the pixel distance between the mouth center and the target point (red dot) is within the set tolerance 15 px, that frame is considered "on target". However, a single frame appearing on target momentarily does not mean the head has actually settled.
 
+For this reason, a second stage separately tracks how much the head position changes between consecutive frames. On each new frame, the current position is compared to the previous one; if the difference stays below a set threshold, a "stable frame" counter is incremented, and if it exceeds the threshold, the counter is reset. Once the counter reaches a predefined value, corresponding to roughly one second's worth of consecutive frames, the head position is considered to have actually settled.
+
+The system only marks the final state as "stabilized" when both "on target" check and the multi-frame "motion has stopped" check are satisfied at the same time; this state is reflected in the corresponding label on the interface and is used as a precondition for actions such as tooth selection and starting a scan. If face tracking is lost for any reason, the system starts evaluating again from a clean stabilization window.
+
+\subsection{Future Implementations}
+
+The current system covers everything up to the computation of the target pose; passing this target on to a physical robotic arm or to a robot simulation such as PyBullet, and resolving it into joint angles through inverse kinematics, is planned as a future implementation step. Once this step is added, it would only require forwarding the Cartesian target already produced by the control panel to that layer.
+
+Head position estimation currently relies on a simplified 2D landmark geometry; in a later stage, this could be replaced with a full 3D pose estimation based on solvePnP and a camera calibration matrix, to improve the accuracy of the position and orientation estimates.
+
+The dental arch template used in the tooth target calculation is currently a fixed, generic geometric template; replacing it in the future with patient measurements, obtained through an initial scan or calibration step, could bring the computed target positions closer to the patient's actual anatomy.
+
+Similarly, the pixel to millimeter conversion currently relies on a single scale constant, based on the assumption that the patient stays at a fixed distance from the camera. If this distance needs to vary, a calibration method that continuously measures distance from the frame would need to replace this fixed constant.
 
 \section{Calculation of Tooth Target}
-Tooth Target, seçilen bir diş için robot kolunun ulaşması gereken hedef
-konumu olan X, Y, Z ve o anki kafa oryantasyonu olan RX, RY, RZ degerlerini
-ifade eder. Hesaplama iki dosyaya bölünmüştür: 
+\label{sec:tooth_target}
+The Tooth Target represents the target position, X, Y, Z, and the current head orientation, RX, RY, RZ, that the robotic arm would need to reach for a selected tooth. The calculation is split across two files: the \texttt{compute\_tooth\_target()} function performs the actual computation, while \texttt{tooth\_target\_controller.py} manages when this result is computed and how it is written to the panel.
 
-Core'da bulunan \texttt{compute\_tooth\_target()} fonksiyonu asıl hesabı yaparken,
-\texttt{tooth\_target\_controller.py} ise bu sonucu ne zaman
-hesaplatacağını ve panele nasıl yazacağını yönetir.
-
-\texttt{compute\_tooth\_target(tooth\_number, head\_position)} fonksiyonu
-oldukça basit bir toplama işlemi yapar: \\
+The \texttt{compute\_tooth\_target(tooth\_number, head\_position)} performs a simple addition: \\
 
   x = \text{head\_position}.x + dx,
 
   y = \text{head\_position}.y + dy,
-  
+
   z = \text{head\_position}.z + dz
 \\
 
-Buradaki dx ve dy değerleri \texttt{TOOTH\_OFFSETS\_MM} sözlüğünden,
-$dz$ değeri ise \texttt{TOOTH\_DEPTH\_OFFSETS\_MM} sözlüğünden, diş
-numarasına göre okunur. Bu iki sözlük coreda teeth data olarak kayitlidir. 
-Bu data sabit bir dental arch modelinden üretilmiştir ve her
-dişin ağız merkezine göre sabit bir konumu olduğunu varsayar.
+Here, dx and dy are read from the \texttt{TOOTH\_OFFSETS\_MM} dictionary, and dz from the \texttt{TOOTH\_DEPTH\_OFFSETS\_MM} dictionary, based on the tooth number. Both dictionaries are stored in core as teeth data. This data is derived from a fixed dental arch model and assumes that each tooth has a fixed position relative to the center of the mouth.
 
-Kafa takibinden gelen veri (\texttt{head\_position}) ile diş anatomisinden gelen sabit veri
-(dx, dy, dz) burada bir araya gelir. \texttt{head\_position} nesnesi
-dişler hakkında hiçbir şey bilmez, \texttt{teeth\_data.py} da kafa
-pozisyonu hakkında hiçbir şey bilmez. Tooth Target, bir kere hesaplanıp ekranda sabit kalan bir değer
-değildir; iki farklı durumda yeniden hesaplanır:
- 
+The data coming from head tracking and the fixed data coming from tooth anatomy (dx, dy, dz) are combined at this point. The Tooth Target is not a value that is computed once and stays fixed on the screen; it is recomputed in two different situations:
+
 \begin{itemize}
-    \item \textbf{Diş seçildiğinde:} Kullanıcı bir dişe tıkladığında
-    \texttt{show\_target\_for(tooth)} metodunu tetiklenir.
-    Bu metot \texttt{compute\_tooth\_target()} sonucunu alır ve
-    X,Y ve Z labellarina mm degeri olarak yazar.
-    \item \textbf{Kafa pozisyonu her güncellendiğinde:} Kamera
-    döngüsü her karede yeni bir kafa pozisyonu hesapladığında, \texttt{CameraController}
-    bir callback tetikler. Eğer o anda bir diş seçiliyse ve kafa hâlâ stabilize durumdaysa,
-    \texttt{show\_target\_for()} tekrar çağrılır ve panel yeni
-    değerlerle güncellenir.
+    \item \textbf{When a tooth is selected:} Clicking a tooth triggers the \texttt{show\_target\_for(tooth)} method. This method takes the result of \texttt{compute\_tooth\_target()} and writes it to the X, Y, and Z labels as meter values.
+    \item \textbf{Whenever the head position is updated:} Each time the camera loop computes a new head position for a frame, \texttt{CameraController} triggers a callback. If a tooth is currently selected and the head is still stabilized, \texttt{show\_target\_for()} is called again and the panel is updated with the new values.
 \end{itemize}
 
-Bu ikinci nokta önemlidir: Tooth Target, tıklama anında alınan tek bir
-"fotoğraf" değildir; diş seçiliyken ve kafa stabilize kaldığı sürece her
-karede yeniden hesaplanan, canlı bir değerdir. Kafa hafifçe hareket
-ederse (ama stabilizasyon toleransı içinde kalıyorsa), panelde gösterilen
-mm değerleri de buna göre anlık güncellenir.
+This second point matters: the Tooth Target is not a single snapshot taken at the moment of the click; it is a live value, recomputed on every frame for as long as a tooth remains selected and the head stays stabilized. If the head moves slightly, while still staying within the stabilization tolerance, the meter values shown on the panel are updated accordingly.
 
-Pozisyon ve oryantasyon iki deger grubu aynı
-panelde birlikte gösterilir, ama kaynakları ve hesaplanma mantıkları
-birbirinden bağımsızdır. Cünkü oryantasyon dişe değil sadece kafanın o
-anki duruşuna bağlıdır.
+The two groups of values, position and orientation, are shown together on the same panel, but their sources and the logic behind their calculation are independent of each other:
 
-RX RY ve RZ rotation degerleri vision bolumunde \texttt{estimate\_head\_orientation()} ile üç açıyı üç farklı yöntemle üretiliyor, ikisi gerçek ölçüm değil yaklaşıklık belirtiyor:
+The RX, RY, and RZ rotation values are produced in the vision module by \texttt{estimate\_head\_orientation()}, using three different approaches for the three angles:
 
-RZ yani roll degeri İki ağız köşesinin (landmark 61 ve 291) piksel koordinatları arasındaki açı doğrudan hesaplanıyor.
-Yani ağız çizgisi yataydan ne kadar sapmışsa bir diger deyisle kafa sağa veya sola yatmışsa, o açı direkt \textit{atan2} ile derece cinsine çevriliyor.
+RZ, the roll value, is computed directly from the angle between the pixel coordinates of the two mouth corners (landmarks 61 and 291). In other words, however much the mouth line deviates from horizontal, that is, however much the head is tilted to the side, this angle is converted directly into degrees using \textit{atan2}.
 
-RY yani yaw ne RX yani pitch 2d landmark verisiyle gercek aci olcumu mumkun olmadigindan sonuc ağız merkezinin (mouth\_mid), tespit edilen yüz kutusunun merkezine göre ne kadar kaydığına bakılarak yaklasik bir deger hesaplamaktadir.
+RY (yaw) and RX (pitch) are computed independently of each other, both relative to the center of the detected face box. The horizontal offset of the mouth center from the face box center, normalized by half the width of the box, gives a ratio used to estimate yaw; the vertical offset, normalized by half the height of the box, gives a separate ratio used to estimate pitch. Each ratio is then scaled by a fixed factor of 45 degrees, so that a mouth center sitting at the edge of the face box corresponds to an estimated angle of about 45 degrees in that direction. 
 
-Bu olcum gercek hayatta \textit{cv2.solvePnP} ile yapilmaktadir (daha da detaylandir)
+\subsection{Future Implementations}
 
-Kafa artık güvenilir şekilde takip edilemezken panelde eski ve artık geçersiz olan bir mm veya derece
-değerinin görünür kalmamaktadir; Bunun yerine kullanici ekranda "-" görür ve bunun henüz
-hesaplanmamış ya da artık geçerli olmayan bir değer olduğunu anlar,
-gerçek bir ölçümle karıştırmaz.
+The most direct improvement to this calculation would be replacing the yaw and pitch approximations described above with a proper 3D pose estimation based on \textit{solvePnP} and a camera calibration matrix, so that RX and RY are computed as true angles rather than being inferred from a shift in 2D landmark positions. This implementation does not cover this real life head position and orientation estimation, which is planned as a future step. 
 
-\section{Manuel Joint Control Mechanism}
-Joint Control paneli, personelin seçilen dişe göre hesaplanan Tooth
-Target'ı elle ince ayar yapabilmesini sağlar. Bu mekanizma iki dosyaya bölünmüştür:
+ \section{Manual Joint Control Mechanism}
 
-\texttt{MotionController} sinifi tüm butonları ve joystick'i oluşturup
-hareketleri hesaplar, \textit{ui/} folderinda bulunan joystick widget file i ise sınıfı ise X/Y ekseni için kullanılan dairesel
-joystick'in çizimini ve mouse etkileşimini yönetir.
-  
-Panelde iki farklı kontrol biçimi bir arada kullanılır, ve bunlar
-bilinçli olarak farklı tasarlanmıştır. X ve Y eksenleri için bir
-\textbf{joystick} kullanılır: bu, sürekli ve orantılı (proportional) bir
-kontroldür — joystick ne kadar ittirilirse, o yöndeki ofset de o oranda
-büyür, ve joystick bırakıldığı anda ofset tekrar sıfıra döner. Z ekseni
-ile RX/RY/RZ dönüşleri için ise \textbf{artımlı (incremental) buton}
-kontrolü kullanılır: her tıklama sabit bir adım kadar (\texttt{Z\_STEP\_MM
-= 1.0} mm, \texttt{ROTATION\_STEP\_DEG = 5.0}°) değeri artırır ya da
-azaltır, ve bu değer bir sonraki tıklamaya kadar olduğu gibi kalır. Bu
-ayrım rastgele değildir: X/Y ince ayarı doğası gereği sürekli ve
-orantılı bir harekettir (joystick bunun için daha doğal bir arayüzdür),
-oysa derinlik ve dönüş ayarları genelde küçük, adım adım düzeltmelerdir
-ve bir buton bu amaca daha uygun düşer.
+When the operator or personnel first presses 'Start' with a tooth selected, \texttt{MotionController.set\_baseline(x, y, z, rx, ry, rz)} is called with the tooth target computed for that tooth at that moment. This stores the baseline position and rotation, and resets any offsets accumulated from a previous baseline back to zero. This baseline is set once, at the start of the alignment phase; selecting a different tooth afterward does not automatically recompute it.
 
-\texttt{MotionController}, her eksen için iki ayrı değer tutar: bir
-\textbf{baseline} (taban değer) ve bir \textbf{jog} (o ana kadar
-yapılan manuel düzeltme). Operatör "Start"a bastığında
-\texttt{set\_baseline(x, y, z, rx, ry, rz)} çağrılır; bu, o anki Tooth
-Target değerlerini baseline olarak kaydeder ve aynı zamanda tüm jog
-değerlerini sıfırlar (\texttt{\_z = 0.0}, üç rotasyon ekseni de
-\texttt{0.0}). Yani her yeni "Start" ile manuel düzeltmeler baştan
-başlar; bir önceki taramadan kalan jog miktarı bir sonrakine taşınmaz.
-Ekranda/terminalde gösterilen değer her zaman şu formülle hesaplanır:
-\[
-  \text{Gösterilen değer} = \text{Baseline} + \text{Jog}
-\]
+The panel is enabled while the system is in the \texttt{aligning} or \texttt{paused} phase, since these are the states where a baseline exists and the joints are not currently in a scan, and it is disabled during \texttt{scanning} to prevent a manual correction from conflicting with an ongoing scan.
+
+The joystick and the Z and rotation buttons apply corrections to the baseline differently. Moving the joystick reports its current horizontal and vertical position directly; this position is scaled by a fixed range of 10 mm and added to the baseline X and Y, so the resulting value reflects where the joystick currently is. Pressing a Z or rotation button, on the other hand, adds a fixed step, 1 mm for Z and 5 degrees for rotation, to a running offset that is kept from one press to the next, so repeated presses in the same direction accumulate.
+
+Each of these updates is printed to the terminal \autoref{fig:joint_terminal}: a joystick movement is reported as, for example, "Joystick: x=3.2 mm, y=-1.5 mm", a Z adjustment as "Z: 2.0 mm", and a rotation adjustment as, for example, "RX: -6.5°". As stated in the Scope, none of these values are sent to a physical robot, since that step has not been implemented.
+
+\subsection{Future Implementations}
+
+Unlike the joystick, whose displacement is inherently bounded by the fixed 10 mm range it is scaled by, the Z and rotation offsets accumulate with every button press without an upper bound, since the underlying step functions only add to a running total. As a future implementation, a maximum offset from the baseline could be added for these two controls as well, so that repeated presses cannot move the target further than a range considered safe for a manual correction.
+
+Two further additions could support this: a reset to baseline control that sets the accumulated Z and rotation offsets back to zero without waiting for a new baseline to be set, useful if the operator has made too large a correction; and showing the accumulated offset next to the baseline value, so the operator can see how far the current pose has moved from the originally computed tooth target rather than only seeing the combined result. Once the robotic integration described earlier is implemented, these same offsets would need to be included in the pose is sent to that layer, so manual adjustments remain part of the same system rather than being handled separately.
 
 \section{Error Handling and Edge Cases}
+\label{sec:error_handling}
+
+When a \texttt{Camera} object is created, the backend passed to \texttt{VideoCapture} is selected automatically based on the operating system: \texttt{cv2.CAP\_AVFOUNDATION} on macOS, \texttt{cv2.CAP\_DSHOW} on Windows, and \texttt{cv2.CAP\_V4L2} on Linux as the default for any other platform. This selection is made by \texttt{\_default\_backend()} using \texttt{platform.system()}, so the same code opens the camera correctly across operating systems without requiring a backend argument to be passed manually, though one can still be supplied explicitly if needed.
+
+Selecting the correct backend does not guarantee that the camera can be opened. If \texttt{cv2.VideoCapture} still fails, for example because no camera is connected or the operating system has not granted camera permission, \texttt{Camera.\_\_init\_\_} raises a \texttt{RuntimeError} with the message "Failed to open camera. Check camera permissions and availability.". This exception is not caught anywhere between \texttt{Camera} and the main window, so a failure at this point stops the application from starting rather than being reported through the interface.
+
+Once the camera has started successfully, a later read failure is handled differently. If \texttt{read\_frame()} returns \texttt{None} during operation, for instance because the camera is disconnected, \texttt{CameraController.\_update\_frame()} calls \texttt{stop()}, which releases the camera, clears the video label and sets its text to "Camera off" (Figure~\ref{fig:camera_off}), resets the face and stabilization indicators, and, if a scan was active, sets \texttt{\_scanning\_active} to \texttt{False}, hides the scanning label, and prints "Scanning Paused".
+
+If no face is present in a frame, the face status is set to not detected, the stabilization state is set to "hidden", \texttt{head\_position.detected} is set to \texttt{False}, and a "Face not found" warning is drawn on the frame (Figure~\ref{fig:face_not_found}); no tooth target is computed for that frame.
+
+Several operator actions are only valid under specific conditions, and the corresponding controller reports why the action did not happen instead of performing it silently:
+
+\begin{itemize}
+    \item Selecting a tooth or pressing Start when no face is detected: \texttt{"Cannot \{action\}: face not detected"} (Figure~\ref{fig:tooth_selection_no_face}).
+    \item Selecting a tooth or pressing Start when the head is not stabilized: \texttt{"Cannot \{action\}: head is not stabilized"} (Figure~\ref{fig:tooth_selection_not_stabilized}).
+    \item Pressing Start while idle with no tooth selected: \texttt{"Cannot start: no tooth selected"} (Figure~\ref{fig:no_tooth_selected}).
+    \item Pressing Start again before the joints have reached the target: \texttt{"Cannot scan yet: target not reached"} (Figure~\ref{fig:scan_target_not_reached}).
+\end{itemize}
+
+If tracking is lost while the system is idle or aligning, \texttt{on\_tracking\_lost()} prints "Tracking lost", (Figure~\ref{fig:tracking_lost}) then clears the tooth selection, the tooth information, and the tooth target, shows the stabilization error label (Figure~\ref{fig:stabilization_error}), disables the 'Start' button, which returns to its faded state (Figure~\ref{fig:button_start_faded}), resets its text, stops the target reached timer, hides the "joints are moving" label, re-enables the motion control panel, and resets the phase to idle.
+
+If tracking is lost while a scan is in progress, two things happen within the same frame update. First, \texttt{CameraController} detects that scanning is active but the face is no longer detected or stabilized, sets \texttt{\_scanning\_active} to \texttt{False}, hides the scanning label, and prints "Scanning Paused" (Figure~\ref{fig:scan_paused}). Immediately after, the same state transition triggers \texttt{on\_tracking\_lost()} in the main window, which prints "Stabilization lost during scan — pausing automatically", calls \texttt{\_enter\_paused()} (which sets the scanning label to its paused state, re-enables the motion control panel, and relabels the 'Start' button back to its faded Scan state, Figure~\ref{fig:button_scan_faded}), shows the stabilization error label, disables the 'Start' button, and clears the tooth target (Figure~\ref{fig:stabilization_error}).
+
+Once tracking is restored, \texttt{on\_tracking\_restored()} hides the stabilization error label and re-enables the Start button; the system does not resume a paused scan automatically, and pressing the 'Start' button again is required to continue.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/errors/camera_off.png}
+    \caption{Video Panel After the Camera Feed Is Lost}
+    \label{fig:camera_off}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/errors/stabilization_error.png}
+    \caption{Stabilization Error}
+    \label{fig:stabilization_error}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/errors/start_no_tooth_selected.png}
+    \caption{Start Button Pressed With No Tooth Selected}
+    \label{fig:no_tooth_selected}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/errors/error_select_tooth.png}
+    \caption{Tooth Selection Attempted With Head Not Stabilized}
+    \label{fig:tooth_selection_not_stabilized}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/errors/error_2_select_tooth.png}
+    \caption{Tooth Selection Attempted With No Face Detected}
+    \label{fig:tooth_selection_no_face}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/errors/tracking_lost_.png}
+    \caption{Tracking Lost Error}
+    \label{fig:tracking_lost}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/errors/scan_target_not_reached.png}
+    \caption{Scan Target Not Reached Error}
+    \label{fig:scan_target_not_reached}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.40\textheight,keepaspectratio]{assets/irmak/errors/scan_paused.png}
+    \caption{Scan Paused}
+    \label{fig:scan_paused}
+\end{figure}
 
 \section{Limitations and Assumptions}
-oryantasyon dişe göre değil sadece kafaya göre hesaplanıyor, farklı dişler için farklı yaklaşma açısı yok
-joystick modeli hasta icin bir guven problemi olusturur mu?
-\section{Testing and Validation}
+\label{sec:limitations}
 
+This section brings together the assumptions and limitations described throughout the report.
 
-\begin{figure}[t]
+\begin{itemize}
+    \item \textbf{Fixed calibration:} The conversion from pixel distances to real world distances is calibrated for a single fixed patient to camera distance. 
+
+    \item \textbf{Approximate head orientation:} The orientation values are not measured with a full 3D pose estimation method together with a camera calibration matrix.
+
+    \item \textbf{Unmeasured depth:} The head position's Z value is not measured from the camera; it is kept at a fixed baseline, consistent with the fixed distance assumption above.
+
+    \item \textbf{Generic dental arch model:} The offsets used to compute a tooth target come from a fixed, generic dental arch template.
+
+    \item \textbf{No robotic hardware connection:} The system does not connect to a physical robotic arm or to a robot simulation. The computed target pose, and any manual joint corrections, are only printed to the terminal.
+
+    \item \textbf{No inverse kinematics:} Converting the computed target pose into joint angles is not implemented; this step is left for future work. 
+
+\end{itemize}
+
+\subsection{UI Demonstration}
+
+The sequence of captured states of the running application is demonstrated from an unstabilized head position to a tooth target that has been reached and is ready for scanning.
+
+Figure~\ref{fig:demo_unstable} shows the panel before the head position has stabilized. No tooth has been selected yet, the Tooth Target panel displays empty values, and the dental chart is overlaid with a stabilization error, matching the \texttt{HEAD IS NOT STABILIZED} status. The 'Start' button remains enabled, but starting a scan at this point is blocked by the same guard described in \autoref{sec:error_handling}.
+
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/demo2-5.png}
-    \caption{Demo}
-    \label{fig:demo_first}
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/demo2-5.png}
+    \caption{Control panel before stabilization, with no tooth selected and a stabilization error shown over the dental chart.}
+    \label{fig:demo_unstable}
 \end{figure}
 
-\begin{figure}[t]
+Once the head position stabilizes, the error banner disappears and the status list reports \texttt{FACE DETECTION} and \texttt{STABILIZATION SUCCESSFUL}, as shown in Figure~\ref{fig:demo_stabilized}. No tooth has been selected yet, so the Tooth Target panel still shows no values, and the Start button remains the only available action.
+
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/demo3.png}
-    \caption{Demo}
-    \label{fig:demo_second}
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/demo3.png}
+    \caption{Control panel after stabilization succeeds, with no tooth selected.}
+    \label{fig:demo_stabilized}
 \end{figure}
 
-\begin{figure}[t]
+After selecting tooth 24 from the dental chart, the Tooth Target panel populates with the computed position and orientation values for that tooth, following the calculation described in \autoref{sec:tooth_target}. The status list now also reports \texttt{TARGET REACHED}, and the top-right button changes from Start to Scan, matching the transition described in the Buttons subsection. Figure~\ref{fig:demo_target_reached} shows this state within the application window, and Figure~\ref{fig:demo_last_fixed} shows the state where scanning phase is completed successfully.
+
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/demo4.png}
-    \caption{Demo}
-    \label{fig:demo_third}
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/demo_4_fixed.png}
+    \caption{Tooth 24 selected, with its target reached and the Scan button now available.}
+    \label{fig:demo_target_reached}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{ui_assets/demo4_6.png}
-    \caption{Demo}
-    \label{fig:demo_fourth}
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/demo_last_fixed.png}
+    \caption{Tooth 24 selected, with its target reached and the Scan is successful}
+    \label{fig:demo_last_fixed}
 \end{figure}
 
-\section{Future Implementations}
+
+
+\section{Connection to the Robot Arm Simulation}
+
+The separate simulation of a UR5e robot arm in PyBullet is controlled through text commands, one of which moves the arm to a given position and orientation. To check whether the Tooth Target output could drive this arm, \texttt{tooth\_target.py} was extended with \texttt{compute\_tooth\_target\_robot\_frame()}, which converts the computed target into meters and adds it on top of a fixed base position the robot can already reach, \texttt{ROBOT\_BASE\_POSITION\_M} $= (0.850, -0.000, 0.380)$, and \texttt{get\_demo\_command()}, which formats this result, together with whether the tooth belongs to the upper or lower jaw, into the \texttt{jaw} and \texttt{m} commands the simulation's console expects. This command is printed automatically whenever a tooth is selected, so it can be copied directly into the simulation terminal.
+
+This process was carried out for an actual tooth selection in the panel, using tooth 14 as an example. With the patient's head stabilized, tooth 14 is selected on the DentaVision Control Panel, which computes and displays its target position and orientation as usual (Figure~\ref{fig:tooth14}). While the tooth remains selected, \texttt{get\_demo\_command()} is called on every update and prints the corresponding \texttt{jaw} and \texttt{m} commands to the panel's terminal (Figure~\ref{fig:tooth14_terminal}).
+
+One of these printed commands is then copied by hand and pasted into the UR5e simulation's own console (Figure~\ref{fig:tooth14_ur5e_terminal}). Confirming the command there first shows a preview of the resulting arm position (Figure~\ref{fig:tooth14_ur5e}), and pressing \texttt{y} to confirm moves the simulated arm into this position (Figure~\ref{fig:tooth14_ur5e_result}).
+
+With this change, the arm moves in roughly the direction and by roughly
+the distance that the Tooth Target estimation gives. This is however not the
+same as a real connection between the two systems. The two
+coordinate frames were never matched to each other, so the arm is not
+actually moving toward the patient's tooth, only moving by an offset that
+happens to carry the right numbers on top of a fixed starting point.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/test/tooth14.png}
+    \caption{Tooth 14 Target Position and Orientation Computed by the System}
+    \label{fig:tooth14}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/test/tooth14_terminal.png}
+    \caption{Tooth 14 Target Position and Orientation Printed in the Terminal}
+    \label{fig:tooth14_terminal}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/test/tooth14_ur5e_terminal.png}
+    \caption{Tooth 14 Command Pasted into the UR5e Simulation Terminal}
+    \label{fig:tooth14_ur5e_terminal}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/test/tooth14_ur5e.png}
+    \caption{Preview of Tooth 14 Target Position and Orientation on the UR5e Robot Arm Simulation}
+    \label{fig:tooth14_ur5e}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\columnwidth,height=0.45\textheight,keepaspectratio]{assets/irmak/test/tooth14_ur5e_result.png}
+    \caption{Tooth 14 Target Position and Orientation on the UR5e Robot Arm Simulation After the Command is Confirmed}
+    \label{fig:tooth14_ur5e_result}
+\end{figure}
+
+
 
